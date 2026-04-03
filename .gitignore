@@ -1,0 +1,13 @@
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Folders
+backup/
+artwork/
+
+# Files
+release.bat
+release-notes.md
+set_version.py
+

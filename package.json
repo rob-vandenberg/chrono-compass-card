@@ -1,0 +1,10 @@
+{
+  "name": "chrono-compass-card",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "terser src/chrono-compass-card.js -o chrono-compass-card.js --compress --mangle"
+  },
+  "devDependencies": {
+    "terser": "^5.0.0"
+  }
+}
