@@ -2,8 +2,11 @@ import { LitElement, html, svg, css } from 'https://unpkg.com/lit@2.0.0/index.js
 import { live } from 'https://unpkg.com/lit@2.0.0/directives/live.js?module';
 
 // ─── Card Version ─────────────────────────────────────────────────────────────
-const CARD_VERSION = '4.1.233';
+const CARD_VERSION = '4.1.243';
 // ─── Card Version History ─────────────────────────────────────────────────────
+// v4.1.243: Remove animation suppression — no longer needed since only one render occurs with correct degrees
+// v4.1.235: Rewrite lifecycle — _needleDegrees non-reactive, single render triggered only after subscription callback fires with correct value; remove _needleDegreesCache entirely
+// v4.1.234: Fix needle flash — move _setupSubscriptions from updated() to willUpdate() so subscriptions fire before first render
 // v4.1.233: Rename cc-textfield to chrono-cc-textfield to avoid conflict with custom-compass-card when both installed simultaneously
 // v4.1.232: Fix needle bump — move cache restore to connectedCallback before _setupSubscriptions so callbacks never see empty _needleDegrees
 // v4.1.231: Fix needle bump — remove _needleDegrees/_needlePrevDegrees reset in _setupSubscriptions; willUpdate cache handles restoration
@@ -58,11 +61,6 @@ const CARD_VERSION = '4.1.233';
 // v3.7.133: Replace REST template polling with WebSocket subscribeMessage; HA tracks entity dependencies and pushes updates automatically
 // v3.7.132: Move bearing template field from Compass panel to Needle panel; rename CSS class to needle-template-grid
 // v3.7.131: Replace compass entity/attribute/adjustment with needle_template (Jinja2); remove willUpdate entity watch
-
-// ─── Needle Degrees Cache ─────────────────────────────────────────────────────
-// Survives element recreation by HA's editor. Keyed by needle templates.
-// Allows willUpdate() to seed _needleDegrees synchronously before first render.
-const _needleDegreesCache = new Map();
 
 // ─── Default Marker ───────────────────────────────────────────────────────────
 const DEFAULT_MARKER = {
@@ -1617,14 +1615,11 @@ customElements.define('chrono-compass-card-editor', ChronoCompassCardEditor);
 // ─── Main Card ────────────────────────────────────────────────────────────────
 class ChronoCompassCard extends LitElement {
   static properties = {
-    hass:          { type: Object },
-    config:        { type: Object },
-    _needleDegrees:         { type: Array },
-    _field1Value:  { type: String },
-    _field2Value:  { type: String },
-    _field3Value:  { type: String },
-    _headerValue:  { type: String },
-    _footerValue:  { type: String },
+    _field1Value:           { type: String },
+    _field2Value:           { type: String },
+    _field3Value:           { type: String },
+    _headerValue:           { type: String },
+    _footerValue:           { type: String },
     _markerDegrees:         { type: Array },
     _backgroundImageUrl:    { type: String },
     _needleImageUrls:       { type: Array },
@@ -1649,21 +1644,31 @@ class ChronoCompassCard extends LitElement {
     this._error               = false;
   }
 
+  set hass(hass) {
+    this._hass = hass;
+    if (this._config && !this._subscriptionsActive) {
+      this._setupSubscriptions();
+    }
+  }
+
+  get hass() {
+    return this._hass;
+  }
+
   setConfig(config) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this._config = { ...DEFAULT_CONFIG, ...config };
+    if (this._hass && !this._subscriptionsActive) {
+      this._setupSubscriptions();
+    }
+  }
+
+  get config() {
+    return this._config;
   }
 
   connectedCallback() {
     super.connectedCallback();
-    if (this.config && this._needleDegrees.length === 0) {
-      const key = this._cacheKey();
-      const cached = _needleDegreesCache.get(key);
-      if (cached) {
-        this._needleDegrees     = [...cached.degrees];
-        this._needlePrevDegrees = [...cached.prevDegrees];
-      }
-    }
-    if (this.hass && this.config && !this._subscriptionsActive) {
+    if (this._hass && this._config) {
       this._setupSubscriptions();
     }
   }
@@ -1673,33 +1678,9 @@ class ChronoCompassCard extends LitElement {
     this._teardownSubscriptions();
   }
 
-  willUpdate(changedProperties) {
-    super.willUpdate(changedProperties);
-    if (!this.config) return;
-    // Seed needle degrees from cache before first render after element recreation.
-    // This runs synchronously before Lit renders, so needle never appears at 0.
-    if (this._needleDegrees.length === 0) {
-      const key = this._cacheKey();
-      const cached = _needleDegreesCache.get(key);
-      if (cached) {
-        this._needleDegrees     = [...cached.degrees];
-        this._needlePrevDegrees = [...cached.prevDegrees];
-      }
-    }
-  }
-
-  _cacheKey() {
-    return (this.config.needles || []).map(n => n.template).join('|');
-  }
-
   updated(changedProperties) {
     super.updated(changedProperties);
     this._scaleElements();
-    if (this.hass && this.config) {
-      if (!this._subscriptionsActive) {
-        this._setupSubscriptions();
-      }
-    }
   }
 
   _setupSubscriptions() {
@@ -1710,7 +1691,6 @@ class ChronoCompassCard extends LitElement {
     const sub = (template, callback) => {
       const tmpl = String(template);
       if (!tmpl.includes('{{')) {
-        // Plain string — use directly, no HA subscription needed
         callback(tmpl);
         return;
       }
@@ -1721,36 +1701,32 @@ class ChronoCompassCard extends LitElement {
       this._templateUnsubs.push(unsub);
     };
 
-    // Needle bearings — one subscription per needle
+    // Needle bearings — one subscription per needle.
+    // _needleDegrees and _needlePrevDegrees are plain (non-reactive) arrays.
+    // We call requestUpdate() manually after populating them, ensuring
+    // exactly one render happens with the correct value — never at 0.
     (this.config.needles || []).forEach((needle, i) => {
       sub(needle.template, (result) => {
         const raw = parseFloat(result);
         if (!isNaN(raw)) {
           const targetNormalized = ((raw % 360) + 360) % 360;
           const prev    = this._needlePrevDegrees[i] ?? null;
-          const current = this._needleDegrees[i]     ?? 0;
+          const current = this._needleDegrees[i]     ?? targetNormalized;
           if (targetNormalized !== prev) {
             const currentMod = ((current % 360) + 360) % 360;
             let delta = targetNormalized - currentMod;
             if (delta > 180)  delta -= 360;
             if (delta < -180) delta += 360;
-            const newDegrees = [...this._needleDegrees];
-            newDegrees[i] = current + delta;
-            this._needleDegrees = newDegrees;
+            this._needleDegrees[i]     = current + delta;
             this._needlePrevDegrees[i] = targetNormalized;
-            // Keep cache current so willUpdate can restore on recreation
-            _needleDegreesCache.set(this._cacheKey(), {
-              degrees:     [...newDegrees],
-              prevDegrees: [...this._needlePrevDegrees],
-            });
+            this.requestUpdate();
           }
           if (i === 0) this._error = false;
         } else {
-          const newDegrees = [...this._needleDegrees];
-          newDegrees[i] = 0;
-          this._needleDegrees = newDegrees;
+          this._needleDegrees[i]     = 0;
           this._needlePrevDegrees[i] = null;
           if (i === 0) this._error = true;
+          this.requestUpdate();
         }
         if (i === 0) this._updateCompassDirectionFields();
       });
@@ -1760,8 +1736,6 @@ class ChronoCompassCard extends LitElement {
     for (const def of this._fieldDefs) {
       if (!def.show) { this[`_field${def.index}Value`] = ''; continue; }
       const idx = def.index;
-      // Template sent to HA untouched — ${compass_direction} is literal text to HA,
-      // only the {{ }} parts are evaluated. Replacement happens in the callback.
       sub(String(def.template), (result) => {
         this[`_field${idx}Value`] = String(result).replace('${compass_direction}', this.getCompassDirection(this._needleDegrees[0] ?? 0));
       });
@@ -1791,7 +1765,7 @@ class ChronoCompassCard extends LitElement {
       sub(this.config.background_image_url, (result) => { this._backgroundImageUrl = result; });
     } else { this._backgroundImageUrl = ''; }
 
-    // Needle image URLs — one subscription per needle
+    // Needle image URLs
     this._needleImageUrls = [];
     (this.config.needles || []).forEach((needle, i) => {
       if (needle.image_show) {
@@ -1840,29 +1814,25 @@ class ChronoCompassCard extends LitElement {
   }
 
   _scaleElements() {
-    const compassLayer = this.shadowRoot.querySelector('.compass-layer');
-    if (!compassLayer) return;
-
+    if (!this.config) return;
     const BASE_DESIGN_WIDTH = 120;
-    const actualWidth = compassLayer.offsetWidth;
-    this._scale = actualWidth / BASE_DESIGN_WIDTH;
+    const cardWidth = this.offsetWidth;
+    if (!cardWidth) return;
 
-    this.style.setProperty('--cc-font-size', `${actualWidth * 0.08}px`);
+    const compassSize = parseFloat(this.config.compass_size) || 0;
+    const faceScale   = cardWidth / BASE_DESIGN_WIDTH;
+    // compass-layer width derived from CSS: card*0.84 + 2*compassSize*(card/120)
+    const compassLayerWidth = cardWidth * 0.84 + 2 * compassSize * faceScale;
 
-    const bezelWidth = parseFloat(this.config.bezel_width);
-    const compassSize = parseFloat(this.config.compass_size);
-    this.style.setProperty('--cc-bezel-width', `${bezelWidth * this._scale}px`);
-    this.style.setProperty('--cc-bezel-color',        this.config.bezel_color);
+    this._scale = compassLayerWidth / BASE_DESIGN_WIDTH;
+
+    this.style.setProperty('--cc-font-size',          `${compassLayerWidth * 0.08}px`);
+    this.style.setProperty('--cc-bezel-width',        `${parseFloat(this.config.bezel_width) * this._scale}px`);
+    this.style.setProperty('--cc-bezel-color',         this.config.bezel_color);
     this.style.setProperty('--cc-bg-color',            this.config.background_color);
-    const faceScale = this.offsetWidth / BASE_DESIGN_WIDTH;
-    this.style.setProperty('--cc-compass-size',         `${compassSize * faceScale}px`);
-
+    this.style.setProperty('--cc-compass-size',       `${compassSize * faceScale}px`);
     this.style.setProperty('--cc-animation-duration', `${this.config.rotation_animation_time}s`);
-
-    const wrapper = this.shadowRoot.querySelector('.compass-ticks-layer');
-    if (wrapper) {
-      this.style.setProperty('--cc-ticks-size', `${wrapper.offsetWidth}px`);
-    }
+    this.style.setProperty('--cc-ticks-size',         `${compassLayerWidth}px`);
   }
 
   getCompassDirection(degrees) {
@@ -2085,9 +2055,9 @@ class ChronoCompassCard extends LitElement {
   }
 
   render() {
+    this._scaleElements();
     const c       = this.config || {};
     const needles = c.needles || [];
-    const scale   = this._scale || 1;
 
     // compass_rotate: compute the rotation that puts needle 1 at north
     const needle0Degrees  = this._needleDegrees[0] ?? 0;
@@ -2111,14 +2081,16 @@ class ChronoCompassCard extends LitElement {
     // Build and render each needle
     const renderNeedle = (needle, i) => {
       if (!needle.show) return html``;
+      if (this._needleDegrees[i] === undefined) return html``;
       const degrees   = this._needleDegrees[i] ?? 0;
       const rotation  = needle.rotate ? degrees + 180 : degrees;
       const pathData  = this._buildNeedlePath(parseFloat(needle.morph), parseFloat(needle.curve), needle.invert, parseFloat(needle.position));
       const { minX, minY, maxX, maxY } = pathData.bounds;
       const viewBox   = `${minX} ${minY} ${maxX - minX} ${maxY - minY}`;
-      const w         = parseFloat(needle.width)    * scale;
-      const h         = parseFloat(needle.height)   * scale;
-      const pos       = parseFloat(needle.position) * scale;
+      const pct       = 100 / 120;  // convert from 120-unit artboard to percentage of layer
+      const w         = `${parseFloat(needle.width)    * pct}%`;
+      const h         = `${parseFloat(needle.height)   * pct}%`;
+      const pos       = `${parseFloat(needle.position) * pct}%`;
       const gradId    = `needleGradient-${i}`;
       const clipId    = `needleClip-${i}`;
       const imageUrl  = this._needleImageUrls[i] || '';
@@ -2130,7 +2102,7 @@ class ChronoCompassCard extends LitElement {
       return html`
         <div class="compass-needle-layer" style="transform:rotate(${rotation}deg)">
           <svg class="compass-needle"
-               style="width:${w}px; height:${h}px; top:calc(0px - ${pos}px);"
+               style="width:${w}; height:${h}; top:calc(0% - ${pos});"
                viewBox="${viewBox}"
                preserveAspectRatio="none">
             <defs>
