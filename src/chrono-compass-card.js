@@ -2,29 +2,35 @@ import { LitElement, html, svg, css } from 'https://unpkg.com/lit@2.0.0/index.js
 import { live } from 'https://unpkg.com/lit@2.0.0/directives/live.js?module';
 
 // ─── Card Version ─────────────────────────────────────────────────────────────
-const CARD_VERSION = '4.0.227';
+const CARD_VERSION = '4.1.233';
 // ─── Card Version History ─────────────────────────────────────────────────────
+// v4.1.233: Rename cc-textfield to chrono-cc-textfield to avoid conflict with custom-compass-card when both installed simultaneously
+// v4.1.232: Fix needle bump — move cache restore to connectedCallback before _setupSubscriptions so callbacks never see empty _needleDegrees
+// v4.1.231: Fix needle bump — remove _needleDegrees/_needlePrevDegrees reset in _setupSubscriptions; willUpdate cache handles restoration
+// v4.1.230: Fix needle bump bug — remove changedProperties.has('config') from updated() to prevent subscription rebuild on every config change
+// v4.1.229: Reorder compass styling grid — Background, Size, Bezel color, Bezel width; rename label to "Size"; update grid columns to 7fr 4fr 7fr 4fr
+// v4.1.228: Rename compass_size to compass_size; rename DOM classes compass-layer/rotate-wrapper/ticks-wrapper/needle-wrapper to compass-layer/rotate-group/ticks-layer/needle-layer; rename CSS vars --cc-compass-size/circle-border-width/circle-color/circle-size to --cc-compass-size/bezel-width/bezel-color/ticks-size; update JS variables and editor UI label
 // v4.0.227: Bump major version to 4.0 — marks full rewrite milestone from 3.x series
 // v3.8.226: Rename card from custom-compass-card to chrono-compass-card; class names updated accordingly
 // v3.8.225: Refactor _colorPicker to accept value+callback — all color fields now use single method, no duplication
 // v3.8.224: Suppress console warnings when typing hex colors — only pass valid 6-digit hex to color input
-// v3.8.223: Scale bezel_size using host element offsetWidth — truly unaffected by internal layout
-// v3.8.222: Scale bezel_size using compass-container width — no feedback loop, correct proportional scaling
-// v3.8.221: Revert _scaleElements to 3.8.214 state — remove bezel_size scaling which caused feedback loop
-// v3.8.220: Fix _scaleElements early return — only require compass-circle, handle compass-container separately
-// v3.8.219: Revert compass-circle DOM check — it fires on every recreation not just first render
-// v3.8.218: Skip needle render on first render (compass-circle not yet in DOM) — eliminates oversized needle flash
-// v3.8.217: Fix scale calculation — use compass-circle for _scale, compass-container for border-size only
-// v3.8.216: Fix infinite resize loop — use compass-container for scale calculation, not compass-circle
-// v3.8.215: Fix bezel_size scaling — now multiplied by _scale factor like bezel_width
+// v3.8.223: Scale compass_size using host element offsetWidth — truly unaffected by internal layout
+// v3.8.222: Scale compass_size using compass-container width — no feedback loop, correct proportional scaling
+// v3.8.221: Revert _scaleElements to 3.8.214 state — remove compass_size scaling which caused feedback loop
+// v3.8.220: Fix _scaleElements early return — only require compass-layer, handle compass-container separately
+// v3.8.219: Revert compass-layer DOM check — it fires on every recreation not just first render
+// v3.8.218: Skip needle render on first render (compass-layer not yet in DOM) — eliminates oversized needle flash
+// v3.8.217: Fix scale calculation — use compass-layer for _scale, compass-container for border-size only
+// v3.8.216: Fix infinite resize loop — use compass-container for scale calculation, not compass-layer
+// v3.8.215: Fix compass_size scaling — now multiplied by _scale factor like bezel_width
 // v3.8.214: Fix needle reset to 0 on config changes — willUpdate() seeds _needleDegrees from module-level cache before render
 // v3.8.213: Rename marker length property to height — matches editor label change
 // v3.8.212: Add name property to needles — shown as panel header, editable field at top of needle panel
-// v3.8.211: Reorder editor CSS to match HTML order; fix cc-textfield input vertical alignment
-// v3.8.210: Revert cc-textfield to native input; add live() to fix minus/decimal display; add min-width:0 to color-field
+// v3.8.211: Reorder editor CSS to match HTML order; fix chrono-cc-textfield input vertical alignment
+// v3.8.210: Revert chrono-cc-textfield to native input; add live() to fix minus/decimal display; add min-width:0 to color-field
 // v3.8.209: Add min-width:0 to .text-field grid item
-// v3.8.208: Fix cc-textfield wa-input layout — hide label/hint parts, constrain width with min-width:0; fix handler null check
-// v3.8.207: Replace native <input> in cc-textfield with wa-input, mirroring ha-input
+// v3.8.208: Fix chrono-cc-textfield wa-input layout — hide label/hint parts, constrain width with min-width:0; fix handler null check
+// v3.8.207: Replace native <input> in chrono-cc-textfield with wa-input, mirroring ha-input
 // v3.8.206: Fix numeric input — replicate ha-form-float logic for minus and decimal handling
 // v3.8.205: Remove mutual exclusivity between cardinal labels and primary ticks — both can be enabled simultaneously
 // v3.8.204: Cardinal labels and primary ticks can now both render at same position
@@ -39,7 +45,7 @@ const CARD_VERSION = '4.0.227';
 // v3.8.146: Restyle add/remove marker buttons to match mwc-button appearance
 // v3.7.145: Replace marker_1/2 flat keys with markers[] array; add flip option; unlimited markers; dynamic editor
 // v3.7.144: Version bump to force HACS cache refresh — clears corrupt hacs.json cached from v3.7.143 initial release
-// v3.7.143: Replace ha-textfield with own cc-textfield component — future-proof against HA 2026.5 removal; fixes width issue in 2026.4
+// v3.7.143: Replace ha-textfield with own chrono-cc-textfield component — future-proof against HA 2026.5 removal; fixes width issue in 2026.4
 // v3.7.142: Fix TypeError in field callback — convert HA result to String before calling replace()
 // v3.7.141: Remove unnecessary _fieldRawValues; simplify ${compass_direction} handling
 // v3.7.140: Fix ${compass_direction} in mixed templates: send template to HA untouched, replace token in callback and on bearing change
@@ -98,7 +104,7 @@ const DEFAULT_CONFIG = {
   background_color:         '#101010',
   bezel_color:              '#383838',
   bezel_width:              16,
-  bezel_size:               0,
+  compass_size:               0,
   background_image_show:    true,
   background_image_url:     '/local/community/chrono-compass-card/black.png',
   background_image_scale:   100,
@@ -180,12 +186,12 @@ const DEFAULT_CONFIG = {
   rotation_animation_time:  0.5,
 };
 
-// ─── cc-textfield ─────────────────────────────────────────────────────────────
+// ─── chrono-cc-textfield ─────────────────────────────────────────────────────────────
 // Own text field component — replaces ha-textfield removed in HA 2026.5.
 // Exposes .value and .type so _valueChanged() works identically to before.
 // Uses live() to preserve intermediate input states (e.g. '-', '1.') without
 // Lit overwriting the displayed value on re-render.
-class CcTextfield extends LitElement {
+class ChronoCcTextfield extends LitElement {
   static properties = {
     value:       { type: String },
     type:        { type: String },
@@ -239,7 +245,7 @@ class CcTextfield extends LitElement {
     this.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
   }
 }
-customElements.define('cc-textfield', CcTextfield);
+customElements.define('chrono-cc-textfield', ChronoCcTextfield);
 
 // ─── Visual Editor ────────────────────────────────────────────────────────────
 class ChronoCompassCardEditor extends LitElement {
@@ -298,11 +304,11 @@ class ChronoCompassCardEditor extends LitElement {
             .value=${colorValue}
             @input=${onChange}
           />
-          <cc-textfield
+          <chrono-cc-textfield
             .value=${value}
             placeholder="#RRGGBB or #RRGGBBAA"
             @input=${onChange}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
       </div>
     `;
@@ -393,22 +399,22 @@ class ChronoCompassCardEditor extends LitElement {
       <!-- Compass styling -->
       <div class="compass-styling-grid">
         ${this._colorPicker('Background', this._config['background_color'] || '#ffffff', e => this._valueChanged('background_color', e))}
+        <div class="text-field">
+          <label>Size</label>
+          <chrono-cc-textfield
+            type="number" step="1"
+            .value=${String(c.compass_size)}
+            @input=${e => this._valueChanged('compass_size', e)}
+          ></chrono-cc-textfield>
+        </div>
         ${this._colorPicker('Bezel color', this._config['bezel_color'] || '#ffffff', e => this._valueChanged('bezel_color', e))}
         <div class="text-field">
           <label>Bezel width</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="1" min="0"
             .value=${String(c.bezel_width)}
             @input=${e => this._valueChanged('bezel_width', e)}
-          ></cc-textfield>
-        </div>
-        <div class="text-field">
-          <label>Bezel size</label>
-          <cc-textfield
-            type="number" step="1"
-            .value=${String(c.bezel_size)}
-            @input=${e => this._valueChanged('bezel_size', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
       </div>
 
@@ -425,44 +431,44 @@ class ChronoCompassCardEditor extends LitElement {
       <div class="background-image-template-grid">
         <div class="text-field">
           <label>URL (jinja template allowed)</label>
-          <cc-textfield
+          <chrono-cc-textfield
             .value=${String(c.background_image_url)}
             @input=${e => this._valueChanged('background_image_url', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
       </div>
       <div class="background-image-styling-grid">
         <div class="text-field">
           <label>X pos</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.5"
             .value=${String(c.background_image_x)}
             @input=${e => this._valueChanged('background_image_x', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Y pos</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.5"
             .value=${String(c.background_image_y)}
             @input=${e => this._valueChanged('background_image_y', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Scale (%)</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="1" min="1"
             .value=${String(c.background_image_scale)}
             @input=${e => this._valueChanged('background_image_scale', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Rotate</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="1"
             .value=${String(c.background_image_rotate)}
             @input=${e => this._valueChanged('background_image_rotate', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
       </div>
 
@@ -489,10 +495,10 @@ class ChronoCompassCardEditor extends LitElement {
           <div class="needle-name-grid">
             <div class="text-field">
               <label>Name (optional)</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 .value=${String(n.name || '')}
                 @input=${e => this._needleChanged(i, 'name', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
           </div>
 
@@ -525,10 +531,10 @@ class ChronoCompassCardEditor extends LitElement {
           <div class="needle-template-grid">
             <div class="text-field">
               <label>Bearing (jinja template)</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 .value=${String(n.template)}
                 @input=${e => this._needleChanged(i, 'template', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
           </div>
 
@@ -537,20 +543,20 @@ class ChronoCompassCardEditor extends LitElement {
             ${this._colorPicker('Color 1', n.color_1 || '#FF0000', e => this._needleChanged(i, 'color_1', e))}
             <div class="text-field">
               <label>Pos (%)</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 type="number" step="1" min="0" max="100"
                 .value=${String(n.color_1_pos)}
                 @input=${e => this._needleChanged(i, 'color_1_pos', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
             ${this._colorPicker('Color 2', n.color_2 || '#EEEEEE', e => this._needleChanged(i, 'color_2', e))}
             <div class="text-field">
               <label>Pos (%)</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 type="number" step="1" min="0" max="100"
                 .value=${String(n.color_2_pos)}
                 @input=${e => this._needleChanged(i, 'color_2_pos', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
           </div>
 
@@ -558,43 +564,43 @@ class ChronoCompassCardEditor extends LitElement {
           <div class="needle-dimensions-grid">
             <div class="text-field">
               <label>Position</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 type="number" step="1"
                 .value=${String(n.position)}
                 @input=${e => this._needleChanged(i, 'position', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
             <div class="text-field">
               <label>Height</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 type="number" step="1" min="4"
                 .value=${String(n.height)}
                 @input=${e => this._needleChanged(i, 'height', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
             <div class="text-field">
               <label>Width</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 type="number" step="1" min="1"
                 .value=${String(n.width)}
                 @input=${e => this._needleChanged(i, 'width', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
             <div class="text-field">
               <label>Morph</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 type="number" step="1"
                 .value=${String(n.morph)}
                 @input=${e => this._needleChanged(i, 'morph', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
             <div class="text-field">
               <label>Curve</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 type="number" step="1"
                 .value=${String(n.curve)}
                 @input=${e => this._needleChanged(i, 'curve', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
           </div>
 
@@ -611,44 +617,44 @@ class ChronoCompassCardEditor extends LitElement {
           <div class="needle-image-template-grid">
             <div class="text-field">
               <label>URL (jinja template allowed)</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 .value=${String(n.image_url)}
                 @input=${e => this._needleChanged(i, 'image_url', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
           </div>
           <div class="needle-image-styling-grid">
             <div class="text-field">
               <label>X pos</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 type="number" step="0.5"
                 .value=${String(n.image_x)}
                 @input=${e => this._needleChanged(i, 'image_x', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
             <div class="text-field">
               <label>Y pos</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 type="number" step="0.5"
                 .value=${String(n.image_y)}
                 @input=${e => this._needleChanged(i, 'image_y', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
             <div class="text-field">
               <label>Scale (%)</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 type="number" step="1" min="1"
                 .value=${String(n.image_scale)}
                 @input=${e => this._needleChanged(i, 'image_scale', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
             <div class="text-field">
               <label>Rotate</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 type="number" step="1"
                 .value=${String(n.image_rotate)}
                 @input=${e => this._needleChanged(i, 'image_rotate', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
           </div>
 
@@ -689,36 +695,36 @@ class ChronoCompassCardEditor extends LitElement {
           <div class="marker-template-grid">
             <div class="text-field">
               <label>Degrees (jinja template allowed)</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 .value=${String(m.degrees)}
                 @input=${e => this._markerChanged(i, 'degrees', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
           </div>
           <div class="marker-styling-grid">
             <div class="text-field">
               <label>Position</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 type="number" step="0.5"
                 .value=${String(m.position)}
                 @input=${e => this._markerChanged(i, 'position', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
             <div class="text-field">
               <label>Height</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 type="number" step="0.1" min="0"
                 .value=${String(m.height)}
                 @input=${e => this._markerChanged(i, 'height', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
             <div class="text-field">
               <label>Width</label>
-              <cc-textfield
+              <chrono-cc-textfield
                 type="number" step="0.1" min="0"
                 .value=${String(m.width)}
                 @input=${e => this._markerChanged(i, 'width', e)}
-              ></cc-textfield>
+              ></chrono-cc-textfield>
             </div>
             ${this._colorPicker('Color', m.color || '#FF0000', e => this._markerChanged(i, 'color', e))}
           </div>
@@ -750,58 +756,58 @@ class ChronoCompassCardEditor extends LitElement {
       <div class="cardinal-labels-grid">
         <div class="text-field">
           <label>North</label>
-          <cc-textfield
+          <chrono-cc-textfield
             .value=${c.cardinal_north}
             @input=${e => this._valueChanged('cardinal_north', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>East</label>
-          <cc-textfield
+          <chrono-cc-textfield
             .value=${c.cardinal_east}
             @input=${e => this._valueChanged('cardinal_east', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>South</label>
-          <cc-textfield
+          <chrono-cc-textfield
             .value=${c.cardinal_south}
             @input=${e => this._valueChanged('cardinal_south', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>West</label>
-          <cc-textfield
+          <chrono-cc-textfield
             .value=${c.cardinal_west}
             @input=${e => this._valueChanged('cardinal_west', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
       </div>
       
       <div class="cardinals-styling-grid">
         <div class="text-field">
           <label>Position</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.5"
             .value=${String(c.cardinals_position)}
             @input=${e => this._valueChanged('cardinals_position', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font size</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.5" min="0"
             .value=${String(c.cardinals_fontsize)}
             @input=${e => this._valueChanged('cardinals_fontsize', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font weight</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="100" min="100" max="900"
             .value=${String(c.cardinals_fontweight)}
             @input=${e => this._valueChanged('cardinals_fontweight', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         ${this._colorPicker('Color', this._config['cardinals_fontcolor'] || '#ffffff', e => this._valueChanged('cardinals_fontcolor', e))}
       </div>
@@ -819,35 +825,35 @@ class ChronoCompassCardEditor extends LitElement {
       <div class="tick-styling-grid">
         <div class="text-field">
           <label>Position</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.5"
             .value=${String(c.major_ticks_position)}
             @input=${e => this._valueChanged('major_ticks_position', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Length</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.1" min="0"
             .value=${String(c.major_ticks_length)}
             @input=${e => this._valueChanged('major_ticks_length', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Width</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.1" min="0"
             .value=${String(c.major_ticks_width)}
             @input=${e => this._valueChanged('major_ticks_width', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Divisions</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="1" min="1"
             .value=${String(c.major_ticks_divisions)}
             @input=${e => this._valueChanged('major_ticks_divisions', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         ${this._colorPicker('Color', this._config['major_ticks_color'] || '#ffffff', e => this._valueChanged('major_ticks_color', e))}
       </div>
@@ -865,35 +871,35 @@ class ChronoCompassCardEditor extends LitElement {
       <div class="tick-styling-grid">
         <div class="text-field">
           <label>Position</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.5"
             .value=${String(c.minor_ticks_position)}
             @input=${e => this._valueChanged('minor_ticks_position', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Length</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.1" min="0"
             .value=${String(c.minor_ticks_length)}
             @input=${e => this._valueChanged('minor_ticks_length', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Width</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.1" min="0"
             .value=${String(c.minor_ticks_width)}
             @input=${e => this._valueChanged('minor_ticks_width', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Divisions</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="1" min="1"
             .value=${String(c.minor_ticks_divisions)}
             @input=${e => this._valueChanged('minor_ticks_divisions', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         ${this._colorPicker('Color', this._config['minor_ticks_color'] || '#ffffff', e => this._valueChanged('minor_ticks_color', e))}
       </div>
@@ -911,35 +917,35 @@ class ChronoCompassCardEditor extends LitElement {
       <div class="tick-styling-grid">
         <div class="text-field">
           <label>Position</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.5"
             .value=${String(c.micro_ticks_position)}
             @input=${e => this._valueChanged('micro_ticks_position', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Length</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.1" min="0"
             .value=${String(c.micro_ticks_length)}
             @input=${e => this._valueChanged('micro_ticks_length', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Width</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.1" min="0"
             .value=${String(c.micro_ticks_width)}
             @input=${e => this._valueChanged('micro_ticks_width', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Divisions</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="1" min="1"
             .value=${String(c.micro_ticks_divisions)}
             @input=${e => this._valueChanged('micro_ticks_divisions', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         ${this._colorPicker('Color', this._config['micro_ticks_color'] || '#ffffff', e => this._valueChanged('micro_ticks_color', e))}
       </div>
@@ -961,36 +967,36 @@ class ChronoCompassCardEditor extends LitElement {
       <div class="field-template-grid">
         <div class="text-field">
           <label>Header (jinja template allowed)</label>
-          <cc-textfield
+          <chrono-cc-textfield
             .value=${c.header_text}
             @input=${e => this._valueChanged('header_text', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
       </div>
       <div class="field-styling-grid">
         <div class="text-field">
           <label>Position</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="1"
             .value=${String(c.header_position)}
             @input=${e => this._valueChanged('header_position', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font size</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.1"
             .value=${String(c.header_fontsize)}
             @input=${e => this._valueChanged('header_fontsize', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font weight</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="100" min="100" max="900"
             .value=${String(c.header_fontweight)}
             @input=${e => this._valueChanged('header_fontweight', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         ${this._colorPicker('Color', this._config['header_fontcolor'] || '#ffffff', e => this._valueChanged('header_fontcolor', e))}
       </div>
@@ -1008,36 +1014,36 @@ class ChronoCompassCardEditor extends LitElement {
       <div class="field-template-grid">
         <div class="text-field">
           <label>Footer (jinja template allowed)</label>
-          <cc-textfield
+          <chrono-cc-textfield
             .value=${c.footer_text}
             @input=${e => this._valueChanged('footer_text', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
       </div>
       <div class="field-styling-grid">
         <div class="text-field">
           <label>Position</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="1"
             .value=${String(c.footer_position)}
             @input=${e => this._valueChanged('footer_position', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font size</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.1"
             .value=${String(c.footer_fontsize)}
             @input=${e => this._valueChanged('footer_fontsize', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font weight</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="100" min="100" max="900"
             .value=${String(c.footer_fontweight)}
             @input=${e => this._valueChanged('footer_fontweight', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         ${this._colorPicker('Color', this._config['footer_fontcolor'] || '#ffffff', e => this._valueChanged('footer_fontcolor', e))}
       </div>
@@ -1059,62 +1065,62 @@ class ChronoCompassCardEditor extends LitElement {
       <div class="field-template-grid">
         <div class="text-field">
           <label>Text (jinja template allowed)</label>
-          <cc-textfield
+          <chrono-cc-textfield
             .value=${c.field_1_template}
             @input=${e => this._valueChanged('field_1_template', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
       </div>
       <div class="field-styling-grid">
         <div class="text-field">
           <label>Position (%)</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="1"
             .value=${String(c.field_1_position)}
             @input=${e => this._valueChanged('field_1_position', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font size</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.1"
             .value=${String(c.field_1_fontsize)}
             @input=${e => this._valueChanged('field_1_fontsize', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font weight</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="100" min="100" max="900"
             .value=${String(c.field_1_fontweight)}
             @input=${e => this._valueChanged('field_1_fontweight', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         ${this._colorPicker('Color', this._config['field_1_fontcolor'] || '#ffffff', e => this._valueChanged('field_1_fontcolor', e))}
       </div>
       <div class="field-unit-grid">
         <div class="text-field">
           <label>Unit</label>
-          <cc-textfield
+          <chrono-cc-textfield
             .value=${c.field_1_unit}
             @input=${e => this._valueChanged('field_1_unit', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font size</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.1"
             .value=${String(c.field_1_unit_fontsize)}
             @input=${e => this._valueChanged('field_1_unit_fontsize', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font weight</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="100" min="100" max="900"
             .value=${String(c.field_1_unit_fontweight)}
             @input=${e => this._valueChanged('field_1_unit_fontweight', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         ${this._colorPicker('Color', this._config['field_1_unit_fontcolor'] || '#ffffff', e => this._valueChanged('field_1_unit_fontcolor', e))}
       </div>
@@ -1133,62 +1139,62 @@ class ChronoCompassCardEditor extends LitElement {
       <div class="field-template-grid">
         <div class="text-field">
           <label>Text (jinja template allowed)</label>
-          <cc-textfield
+          <chrono-cc-textfield
             .value=${c.field_2_template}
             @input=${e => this._valueChanged('field_2_template', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
       </div>
       <div class="field-styling-grid">
         <div class="text-field">
           <label>Position (%)</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="1"
             .value=${String(c.field_2_position)}
             @input=${e => this._valueChanged('field_2_position', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font size</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.1"
             .value=${String(c.field_2_fontsize)}
             @input=${e => this._valueChanged('field_2_fontsize', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font weight</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="100" min="100" max="900"
             .value=${String(c.field_2_fontweight)}
             @input=${e => this._valueChanged('field_2_fontweight', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         ${this._colorPicker('Color', this._config['field_2_fontcolor'] || '#ffffff', e => this._valueChanged('field_2_fontcolor', e))}
       </div>
       <div class="field-unit-grid">
         <div class="text-field">
           <label>Unit</label>
-          <cc-textfield
+          <chrono-cc-textfield
             .value=${c.field_2_unit}
             @input=${e => this._valueChanged('field_2_unit', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font size</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.1"
             .value=${String(c.field_2_unit_fontsize)}
             @input=${e => this._valueChanged('field_2_unit_fontsize', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font weight</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="100" min="100" max="900"
             .value=${String(c.field_2_unit_fontweight)}
             @input=${e => this._valueChanged('field_2_unit_fontweight', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         ${this._colorPicker('Color', this._config['field_2_unit_fontcolor'] || '#ffffff', e => this._valueChanged('field_2_unit_fontcolor', e))}
       </div>
@@ -1207,62 +1213,62 @@ class ChronoCompassCardEditor extends LitElement {
       <div class="field-template-grid">
         <div class="text-field">
           <label>Text (jinja template allowed)</label>
-          <cc-textfield
+          <chrono-cc-textfield
             .value=${c.field_3_template}
             @input=${e => this._valueChanged('field_3_template', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
       </div>
       <div class="field-styling-grid">
         <div class="text-field">
           <label>Position (%)</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="1"
             .value=${String(c.field_3_position)}
             @input=${e => this._valueChanged('field_3_position', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font size</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.1"
             .value=${String(c.field_3_fontsize)}
             @input=${e => this._valueChanged('field_3_fontsize', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font weight</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="100" min="100" max="900"
             .value=${String(c.field_3_fontweight)}
             @input=${e => this._valueChanged('field_3_fontweight', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         ${this._colorPicker('Color', this._config['field_3_fontcolor'] || '#ffffff', e => this._valueChanged('field_3_fontcolor', e))}
       </div>
       <div class="field-unit-grid">
         <div class="text-field">
           <label>Unit</label>
-          <cc-textfield
+          <chrono-cc-textfield
             .value=${c.field_3_unit}
             @input=${e => this._valueChanged('field_3_unit', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font size</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="0.1"
             .value=${String(c.field_3_unit_fontsize)}
             @input=${e => this._valueChanged('field_3_unit_fontsize', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         <div class="text-field">
           <label>Font weight</label>
-          <cc-textfield
+          <chrono-cc-textfield
             type="number" step="100" min="100" max="900"
             .value=${String(c.field_3_unit_fontweight)}
             @input=${e => this._valueChanged('field_3_unit_fontweight', e)}
-          ></cc-textfield>
+          ></chrono-cc-textfield>
         </div>
         ${this._colorPicker('Color', this._config['field_3_unit_fontcolor'] || '#ffffff', e => this._valueChanged('field_3_unit_fontcolor', e))}
       </div>
@@ -1317,7 +1323,7 @@ class ChronoCompassCardEditor extends LitElement {
       cursor: pointer;
       flex-shrink: 0;
     }
-    .color-row cc-textfield {
+    .color-row chrono-cc-textfield {
       flex: 1;
       --input-fill-color: transparent;
     }
@@ -1352,14 +1358,14 @@ class ChronoCompassCardEditor extends LitElement {
       font-style: italic;
     }
 
-    cc-textfield {
+    chrono-cc-textfield {
       display: block;
       width: 100%;
     }
 
     .compass-styling-grid {
       display: grid;
-      grid-template-columns: 7fr 7fr 4fr 4fr;
+      grid-template-columns: 7fr 4fr 7fr 4fr;
       gap: 8px;
       margin-top: 24px;
       margin-bottom: 16px;
@@ -1649,6 +1655,14 @@ class ChronoCompassCard extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    if (this.config && this._needleDegrees.length === 0) {
+      const key = this._cacheKey();
+      const cached = _needleDegreesCache.get(key);
+      if (cached) {
+        this._needleDegrees     = [...cached.degrees];
+        this._needlePrevDegrees = [...cached.prevDegrees];
+      }
+    }
     if (this.hass && this.config && !this._subscriptionsActive) {
       this._setupSubscriptions();
     }
@@ -1682,7 +1696,7 @@ class ChronoCompassCard extends LitElement {
     super.updated(changedProperties);
     this._scaleElements();
     if (this.hass && this.config) {
-      if (!this._subscriptionsActive || changedProperties.has('config')) {
+      if (!this._subscriptionsActive) {
         this._setupSubscriptions();
       }
     }
@@ -1708,8 +1722,6 @@ class ChronoCompassCard extends LitElement {
     };
 
     // Needle bearings — one subscription per needle
-    this._needleDegrees     = [];
-    this._needlePrevDegrees = [];
     (this.config.needles || []).forEach((needle, i) => {
       sub(needle.template, (result) => {
         const raw = parseFloat(result);
@@ -1828,28 +1840,28 @@ class ChronoCompassCard extends LitElement {
   }
 
   _scaleElements() {
-    const circle = this.shadowRoot.querySelector('.compass-circle');
-    if (!circle) return;
+    const compassLayer = this.shadowRoot.querySelector('.compass-layer');
+    if (!compassLayer) return;
 
     const BASE_DESIGN_WIDTH = 120;
-    const actualWidth = circle.offsetWidth;
+    const actualWidth = compassLayer.offsetWidth;
     this._scale = actualWidth / BASE_DESIGN_WIDTH;
 
     this.style.setProperty('--cc-font-size', `${actualWidth * 0.08}px`);
 
-    const initBorder = parseFloat(this.config.bezel_width);
-    const borderSize = parseFloat(this.config.bezel_size);
-    this.style.setProperty('--cc-circle-border-width', `${initBorder * this._scale}px`);
-    this.style.setProperty('--cc-circle-color',        this.config.bezel_color);
+    const bezelWidth = parseFloat(this.config.bezel_width);
+    const compassSize = parseFloat(this.config.compass_size);
+    this.style.setProperty('--cc-bezel-width', `${bezelWidth * this._scale}px`);
+    this.style.setProperty('--cc-bezel-color',        this.config.bezel_color);
     this.style.setProperty('--cc-bg-color',            this.config.background_color);
-    const borderScale = this.offsetWidth / BASE_DESIGN_WIDTH;
-    this.style.setProperty('--cc-border-size',         `${borderSize * borderScale}px`);
+    const faceScale = this.offsetWidth / BASE_DESIGN_WIDTH;
+    this.style.setProperty('--cc-compass-size',         `${compassSize * faceScale}px`);
 
     this.style.setProperty('--cc-animation-duration', `${this.config.rotation_animation_time}s`);
 
-    const wrapper = this.shadowRoot.querySelector('.compass-ticks-wrapper');
+    const wrapper = this.shadowRoot.querySelector('.compass-ticks-layer');
     if (wrapper) {
-      this.style.setProperty('--cc-circle-size', `${wrapper.offsetWidth}px`);
+      this.style.setProperty('--cc-ticks-size', `${wrapper.offsetWidth}px`);
     }
   }
 
@@ -2038,7 +2050,7 @@ class ChronoCompassCard extends LitElement {
     }).filter(Boolean);
 
     return html`
-      <div class="compass-ticks-wrapper">
+      <div class="compass-ticks-layer">
         <svg class="compass-ticks" viewBox="0 0 100 100" preserveAspectRatio="none">
           ${ticks.map(t => {
             if (t.type === 'text') return svg`
@@ -2116,7 +2128,7 @@ class ChronoCompassCard extends LitElement {
       const g2pos     = needle.invert ? 100 - parseFloat(needle.color_1_pos) : parseFloat(needle.color_2_pos);
 
       return html`
-        <div class="compass-needle-wrapper" style="transform:rotate(${rotation}deg)">
+        <div class="compass-needle-layer" style="transform:rotate(${rotation}deg)">
           <svg class="compass-needle"
                style="width:${w}px; height:${h}px; top:calc(0px - ${pos}px);"
                viewBox="${viewBox}"
@@ -2159,7 +2171,7 @@ class ChronoCompassCard extends LitElement {
           </div>
         ` : ''}
         <div class="compass-container">
-          <div class="compass-circle">
+          <div class="compass-layer">
             ${c.background_image_show && this._backgroundImageUrl ? html`
               <img class="compass-bg-image"
                 src="${this._backgroundImageUrl}"
@@ -2170,7 +2182,7 @@ class ChronoCompassCard extends LitElement {
             ${renderField(fieldDefs[1], this._field2Value)}
             ${renderField(fieldDefs[2], this._field3Value)}
           </div>
-          <div class="compass-rotate-wrapper" style="transform:rotate(${compassRotation}deg)">
+          <div class="compass-rotate-group" style="transform:rotate(${compassRotation}deg)">
             ${this._renderTicks()}
             ${[...needles].reverse().map((n, ri) => renderNeedle(n, needles.length - 1 - ri))}
           </div>
@@ -2218,15 +2230,15 @@ class ChronoCompassCard extends LitElement {
       overflow: hidden;
       box-sizing: border-box;
     }
-    .compass-circle {
+    .compass-layer {
       position: absolute;
-      top:    calc(8% - var(--cc-border-size, 0px));
-      left:   calc(8% - var(--cc-border-size, 0px));
-      right:  calc(8% - var(--cc-border-size, 0px));
-      bottom: calc(8% - var(--cc-border-size, 0px));
+      top:    calc(8% - var(--cc-compass-size, 0px));
+      left:   calc(8% - var(--cc-compass-size, 0px));
+      right:  calc(8% - var(--cc-compass-size, 0px));
+      bottom: calc(8% - var(--cc-compass-size, 0px));
       border-radius: 50%;
       background-color: var(--cc-bg-color, #111111);
-      border: var(--cc-circle-border-width, 15px) solid var(--cc-circle-color, #333333);
+      border: var(--cc-bezel-width, 15px) solid var(--cc-bezel-color, #333333);
       box-sizing: border-box;
       font-size: var(--cc-font-size, 1em);
       overflow: hidden;
@@ -2242,17 +2254,17 @@ class ChronoCompassCard extends LitElement {
       pointer-events: none;
       z-index: 0;
     }
-    .compass-rotate-wrapper {
+    .compass-rotate-group {
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
       transition: transform var(--cc-animation-duration, 0.3s) ease-out;
     }
-    .compass-ticks-wrapper {
+    .compass-ticks-layer {
       position: absolute;
-      top:    calc(8% - var(--cc-border-size, 0px));
-      left:   calc(8% - var(--cc-border-size, 0px));
-      right:  calc(8% - var(--cc-border-size, 0px));
-      bottom: calc(8% - var(--cc-border-size, 0px));
+      top:    calc(8% - var(--cc-compass-size, 0px));
+      left:   calc(8% - var(--cc-compass-size, 0px));
+      right:  calc(8% - var(--cc-compass-size, 0px));
+      bottom: calc(8% - var(--cc-compass-size, 0px));
       display: flex;
       justify-content: center;
       align-items: center;
@@ -2261,16 +2273,16 @@ class ChronoCompassCard extends LitElement {
     }
     .compass-ticks {
       position: absolute;
-      width:  var(--cc-circle-size, 100px);
-      height: var(--cc-circle-size, 100px);
+      width:  var(--cc-ticks-size, 100px);
+      height: var(--cc-ticks-size, 100px);
       overflow: visible;
     }
-    .compass-needle-wrapper {
+    .compass-needle-layer {
       position: absolute;
-      top:    calc(8% - var(--cc-border-size, 0px));
-      left:   calc(8% - var(--cc-border-size, 0px));
-      right:  calc(8% - var(--cc-border-size, 0px));
-      bottom: calc(8% - var(--cc-border-size, 0px));
+      top:    calc(8% - var(--cc-compass-size, 0px));
+      left:   calc(8% - var(--cc-compass-size, 0px));
+      right:  calc(8% - var(--cc-compass-size, 0px));
+      bottom: calc(8% - var(--cc-compass-size, 0px));
       display: flex;
       justify-content: center;
       align-items: center;
