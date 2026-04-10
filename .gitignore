@@ -6,6 +6,8 @@ Thumbs.db
 backup/
 artwork/
 screenshot/
+chrono-compass-card/
+github/
 
 # Files
 *.bat
