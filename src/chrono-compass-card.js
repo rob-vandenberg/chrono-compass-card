@@ -2,8 +2,12 @@ import { LitElement, html, svg, css } from 'https://unpkg.com/lit@2.0.0/index.js
 import { live } from 'https://unpkg.com/lit@2.0.0/directives/live.js?module';
 
 // ─── Card Version ─────────────────────────────────────────────────────────────
-const CARD_VERSION = '4.3.719';
+const CARD_VERSION = '4.3.723';
 // ─── Card Version History ─────────────────────────────────────────────────────
+// v4.3.723: Revert to v4.3.719 — image clipping feature parked; clip path offset issue not resolved
+// v4.3.722: Fix image_clip bounding box center Y — use _yShift+_h (P2/P4 line) not _yShift+_h/2
+// v4.3.721: When image_clip is true, use square bounding box (side=max(width,height*2)) centered on needle — morph ignored; ensures full moon image fills circle before clipping to crescent
+// v4.3.720: Add image_clip to DEFAULT_NEEDLE; when true, needle path used as clipPath for image; add Clip image toggle to needle-image-toggles-grid; grid updated to 1fr 1fr
 // v4.3.719: Fix P3 control point distance — use cHoriz instead of cP3; P3 distance is always equal to P1, independent of morph
 // v4.3.718: Split cDown into cDown (P2/P4, signed morph) and cP3 (abs morph) — fixes negative morph direction flip on P2/P4 while keeping P3 control distance correct
 // v4.3.717: Fix cDown — use Math.abs(morph) so negative morph does not invert control point distances
