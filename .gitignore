@@ -6,7 +6,7 @@ Thumbs.db
 backup/
 artwork/
 screenshot/
-chrono-compass-card/
+dist/
 github/
 
 # Files
