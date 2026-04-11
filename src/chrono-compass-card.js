@@ -3,6 +3,7 @@ import { live } from 'https://unpkg.com/lit@2.0.0/directives/live.js?module';
 
 // ─── Card Version ─────────────────────────────────────────────────────────────
 const CARD_VERSION = '4.3.723';
+
 // ─── Card Version History ─────────────────────────────────────────────────────
 // v4.3.723: Revert to v4.3.719 — image clipping feature parked; clip path offset issue not resolved
 // v4.3.722: Fix image_clip bounding box center Y — use _yShift+_h (P2/P4 line) not _yShift+_h/2
