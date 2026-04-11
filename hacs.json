@@ -1,6 +1,5 @@
 {
   "name": "Chrono Compass Card",
-  "filename": "chrono-compass-card.zip",
-  "zip_release": true,
-  "render_readme": true  
+  "filename": "chrono-compass-card.js",
+  "content_in_root": false
 }
