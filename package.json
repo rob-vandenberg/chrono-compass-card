@@ -2,7 +2,7 @@
   "name": "chrono-compass-card",
   "version": "1.0.0",
   "scripts": {
-    "build": "terser src/chrono-compass-card.js -o chrono-compass-card.js --compress --mangle"
+    "build": "terser src/chrono-compass-card.js -o dist/chrono-compass-card.js --compress --mangle && terser src/chrono-compass-lib.js -o dist/chrono-compass-lib.js --compress --mangle"
   },
   "devDependencies": {
     "terser": "^5.0.0"

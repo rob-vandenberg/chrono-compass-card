@@ -22,7 +22,7 @@ jobs:
       - name: Commit and push
         uses: EndBug/add-and-commit@v9
         with:
-          add: '["src/chrono-compass-card.js", "chrono-compass-card.js"]'
+          add: '["src/chrono-compass-card.js", "src/chrono-compass-lib.js", "dist/chrono-compass-card.js", "dist/chrono-compass-lib.js"]'
           message: "Publishing version ${{ github.event.inputs.version }}"
           tag: "v${{ github.event.inputs.version }}"
       - name: Publish Github release
@@ -32,4 +32,4 @@ jobs:
           name: "v${{ github.event.inputs.version }}"
           body: "Published by Rob Vandenberg"
           makeLatest: true
-          artifacts: "chrono-compass-card.js,dist/**"
+          artifacts: "dist/chrono-compass-card.js,dist/chrono-compass-lib.js,dist/**"

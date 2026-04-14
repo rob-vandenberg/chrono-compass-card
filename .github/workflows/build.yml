@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'src/chrono-compass-card.js'
+      - 'src/chrono-compass-lib.js'
   workflow_dispatch:
 
 permissions:
@@ -30,5 +31,5 @@ jobs:
       - name: Commit built file
         uses: EndBug/add-and-commit@v9
         with:
-          add: 'chrono-compass-card.js'
+          add: '["dist/chrono-compass-card.js", "dist/chrono-compass-lib.js"]'
           message: "Auto-build minified JS from source v${{ steps.version.outputs.version }}"

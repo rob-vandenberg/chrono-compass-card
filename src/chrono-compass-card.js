@@ -1,10 +1,17 @@
 import { LitElement, html, svg, css } from 'https://unpkg.com/lit@2.0.0/index.js?module';
 import { live } from 'https://unpkg.com/lit@2.0.0/directives/live.js?module';
+import { ccParseNumber, ccTextField, ccToggleField, ccColorPicker, ccButtonPicker, ChronoTextfield, ChronoButtonToggleGroup } from './chrono-compass-lib.js';
 
 // ─── Card Version ─────────────────────────────────────────────────────────────
-const CARD_VERSION = '4.3.723';
+const CARD_VERSION = '4.4.802';
 
 // ─── Card Version History ─────────────────────────────────────────────────────
+// v4.4.802: Move _textField, _toggleField, _colorPicker, _buttonPicker editor helpers to chrono-compass-lib.js; import ccTextField, ccToggleField, ccColorPicker, ccButtonPicker
+// v4.4.800: Extract ChronoTextfield, ChronoButtonToggleGroup, ccParseNumber into chrono-compass-lib.js; import from library
+// v4.3.727: Refactor tick tiers from flat keys (major_ticks_*, minor_ticks_*, micro_ticks_*) to ticks[] array; add DEFAULT_TICK constant; tier offset constants removed, default position values used instead; tier 0 exempt from occupied check, tiers 1+ blocked by occupied
+// v4.3.726: Update editor to modify fields[] array elements instead of flat field_1/2/3 keys; add _fieldChanged() method; replace three hardcoded field blocks with single fields.map() loop
+// v4.3.725: Refactor custom fields from flat keys (field_1_*, field_2_*, field_3_*) to fields[] array; add DEFAULT_CUSTOM_FIELD constant; position is now absolute percentage (default 25/50/75), replacing previous relative offset from fixed base
+// v4.3.724: Added second catch in _teardownSubscriptions() to prevent console warning: Uncaught (in promise) {code: 'not_found', message: 'Subscription not found.'}
 // v4.3.723: Revert to v4.3.719 — image clipping feature parked; clip path offset issue not resolved
 // v4.3.722: Fix image_clip bounding box center Y — use _yShift+_h (P2/P4 line) not _yShift+_h/2
 // v4.3.721: When image_clip is true, use square bounding box (side=max(width,height*2)) centered on needle — morph ignored; ensures full moon image fills circle before clipping to crescent
@@ -154,6 +161,31 @@ const DEFAULT_MARKER = {
   flip:     false,
 };
 
+// ─── Default Tick ─────────────────────────────────────────────────────────────
+const DEFAULT_TICK = {
+  show:      false,
+  linecap:   'round',
+  divisions: 4,
+  length:    3,
+  width:     1.5,
+  position:  0,
+  color:     '#AAAAAA',
+};
+
+// ─── Default Custom Field ─────────────────────────────────────────────────────
+const DEFAULT_CUSTOM_FIELD = {
+  show:             true,
+  template:         '',
+  fontsize:         1.8,
+  fontweight:       400,
+  position:         50,
+  fontcolor:        '#FFFFFF',
+  unit:             '',
+  unit_fontsize:    1.4,
+  unit_fontweight:  400,
+  unit_fontcolor:   '#FFFFFF',
+};
+
 // ─── Default Configuration ────────────────────────────────────────────────────
 const DEFAULT_CONFIG = {
   background_color:         '#101010',
@@ -182,29 +214,38 @@ const DEFAULT_CONFIG = {
   cardinals_position:       0,
   cardinals_fontcolor:      '#EEEEEE',
   
-  major_ticks_show:         false,
-  major_ticks_linecap:      'round',
-  major_ticks_divisions:    4,
-  major_ticks_length:       6,
-  major_ticks_width:        2,
-  major_ticks_position:     0,
-  major_ticks_color:        '#CCCCCC',
-  
-  minor_ticks_show:         true,
-  minor_ticks_linecap:      'round',
-  minor_ticks_divisions:    8,
-  minor_ticks_length:       3,
-  minor_ticks_width:        1.5,
-  minor_ticks_position:     0,
-  minor_ticks_color:        '#AAAAAA',
-  
-  micro_ticks_show:         true,
-  micro_ticks_linecap:      'round',
-  micro_ticks_divisions:    16,
-  micro_ticks_length:       0,
-  micro_ticks_width:        2,
-  micro_ticks_position:     0,
-  micro_ticks_color:        '#888888',
+  ticks: [
+    {
+      ...DEFAULT_TICK,
+      show:      false,
+      linecap:   'round',
+      divisions: 4,
+      length:    6,
+      width:     2,
+      position:  -2.9,
+      color:     '#CCCCCC',
+    },
+    {
+      ...DEFAULT_TICK,
+      show:      true,
+      linecap:   'round',
+      divisions: 8,
+      length:    3,
+      width:     1.5,
+      position:  -4.6,
+      color:     '#AAAAAA',
+    },
+    {
+      ...DEFAULT_TICK,
+      show:      true,
+      linecap:   'round',
+      divisions: 16,
+      length:    0,
+      width:     2,
+      position:  -6.3,
+      color:     '#888888',
+    },
+  ],
   
   header_show:              false,
   header_text:              'header',
@@ -220,174 +261,50 @@ const DEFAULT_CONFIG = {
   footer_position:          0,
   footer_fontcolor:         '#FFFFFF',
   
-  field_1_show:             true,
-  field_1_template:         '${compass_direction}',
-  field_1_fontsize:         1.8,
-  field_1_fontweight:       400,
-  field_1_position:         0,
-  field_1_fontcolor:        '#29B6CF',
-  field_1_unit:             '',
-  field_1_unit_fontsize:    1.4,
-  field_1_unit_fontweight:  400,
-  field_1_unit_fontcolor:   '#196D7C',
-  
-  field_2_show:             false,
-  field_2_template:         "{{ states('sensor.ws_wind_speed') | round(1) }}",
-  field_2_unit:             'km/h',
-  field_2_fontsize:         2.2,
-  field_2_fontweight:       400,
-  field_2_position:         0,
-  field_2_fontcolor:        '#E8E8E8',
-  field_2_unit_fontsize:    1.4,
-  field_2_unit_fontweight:  400,
-  field_2_unit_fontcolor:   '#8C8C8C',
-  
-  field_3_show:             true,
-  field_3_template:         "{{ state_attr('sun.sun', 'azimuth') | round(0) }}",
-  field_3_unit:             '°',
-  field_3_fontsize:         1.8,
-  field_3_fontweight:       400,
-  field_3_position:         0,
-  field_3_fontcolor:        '#808080',
-  field_3_unit_fontsize:    1.4,
-  field_3_unit_fontweight:  400,
-  field_3_unit_fontcolor:   '#606060',
+  fields: [
+    {
+      ...DEFAULT_CUSTOM_FIELD,
+      show:           true,
+      template:       '${compass_direction}',
+      fontsize:       1.8,
+      fontweight:     400,
+      position:       25,
+      fontcolor:      '#29B6CF',
+      unit:           '',
+      unit_fontsize:  1.4,
+      unit_fontweight: 400,
+      unit_fontcolor: '#196D7C',
+    },
+    {
+      ...DEFAULT_CUSTOM_FIELD,
+      show:           false,
+      template:       "{{ states('sensor.ws_wind_speed') | round(1) }}",
+      fontsize:       2.2,
+      fontweight:     400,
+      position:       50,
+      fontcolor:      '#E8E8E8',
+      unit:           'km/h',
+      unit_fontsize:  1.4,
+      unit_fontweight: 400,
+      unit_fontcolor: '#8C8C8C',
+    },
+    {
+      ...DEFAULT_CUSTOM_FIELD,
+      show:           true,
+      template:       "{{ state_attr('sun.sun', 'azimuth') | round(0) }}",
+      fontsize:       1.8,
+      fontweight:     400,
+      position:       75,
+      fontcolor:      '#808080',
+      unit:           '°',
+      unit_fontsize:  1.4,
+      unit_fontweight: 400,
+      unit_fontcolor: '#606060',
+    },
+  ],
   
   rotation_animation_time:  0.5,
 };
-
-// ─── chrono-textfield ─────────────────────────────────────────────────────────────
-// Own text field component — replaces ha-textfield removed in HA 2026.5.
-// Exposes .value and .type so _valueChanged() works identically to before.
-// Uses live() to preserve intermediate input states (e.g. '-', '1.') without
-// Lit overwriting the displayed value on re-render.
-class ChronoTextfield extends LitElement {
-  static properties = {
-    value:       { type: String },
-    type:        { type: String },
-    step:        { type: String },
-    min:         { type: String },
-    max:         { type: String },
-    placeholder: { type: String },
-  };
-
-  static styles = css`
-    :host {
-      display: block;
-      width: 100%;
-    }
-    input {
-      display: block;
-      width: 100%;
-      box-sizing: border-box;
-      height: 56px;
-      padding: 0 12px;
-      background: var(--input-fill-color, rgba(0,0,0,0.06));
-      border: none;
-      border-bottom: 1px solid var(--secondary-text-color, #888);
-      border-radius: 4px 4px 0 0;
-      color: var(--primary-text-color);
-      font-size: 16px;
-      font-family: inherit;
-      outline: none;
-      transition: border-bottom-color 0.2s;
-    }
-    input:focus {
-      border-bottom: 2px solid var(--primary-color);
-    }
-  `;
-
-  render() {
-    return html`
-      <input
-        .value=${live(this.value ?? '')}
-        type=${this.type || 'text'}
-        step=${this.step || ''}
-        min=${this.min || ''}
-        max=${this.max || ''}
-        @input=${this._onInput}
-      />
-    `;
-  }
-
-  _onInput(e) {
-    this.value = e.target.value;
-    this.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-  }
-}
-customElements.define('chrono-textfield', ChronoTextfield);
-
-
-// ─── chrono-button-toggle-group ───────────────────────────────────────────────────
-// Segmented button control — mimics HA's ha-button-toggle-group appearance.
-// Dispatches CustomEvent('change', { detail: { value } }) on selection.
-class ChronoButtonToggleGroup extends LitElement {
-  static properties = {
-    value:   { type: String },
-    options: { type: Array },
-  };
-
-  static styles = css`
-    :host {
-      display: inline-flex;
-    }
-    button {
-      height: 28px;
-      min-width: 70px;
-      padding: 0 12px;
-      border: none;
-      border-right: 1px solid var(--ha-color-border-neutral-quiet, #5e5e5e);
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 500;
-      font-family: inherit;
-      background: var(--ha-color-fill-primary-normal-resting, #002e3e);
-      color: var(--primary-text-color, #e1e1e1);
-      transition: background 150ms ease, color 150ms ease;
-      border-radius: 0;
-    }
-    button:last-child {
-      border-right: none;
-    }
-    button.first {
-      border-radius: 9999px 0 0 9999px;
-    }
-    button.last {
-      border-radius: 0 9999px 9999px 0;
-    }
-    button.only {
-      border-radius: 9999px;
-    }
-    button.active {
-      background: var(--ha-color-fill-primary-loud-resting, #009ac7);
-      color: var(--primary-text-color, #e1e1e1);
-    }
-    button:hover:not(.active) {
-      background: var(--ha-color-fill-primary-quiet-hover, #004156);
-    }
-  `;
-
-  render() {
-    const opts = this.options || [];
-    return html`${opts.map((opt, i) => {
-      const isFirst  = i === 0;
-      const isLast   = i === opts.length - 1;
-      const isOnly   = opts.length === 1;
-      const isActive = opt.value === this.value;
-      const cls = [
-        isActive ? 'active' : '',
-        isOnly ? 'only' : (isFirst ? 'first' : (isLast ? 'last' : '')),
-      ].filter(Boolean).join(' ');
-      return html`<button class="${cls}" @click=${() => this._select(opt.value)}>${opt.label}</button>`;
-    })}`;
-  }
-
-  _select(value) {
-    this.value = value;
-    this.dispatchEvent(new CustomEvent('change', { detail: { value }, bubbles: true, composed: true }));
-  }
-}
-customElements.define('chrono-button-toggle-group', ChronoButtonToggleGroup);
 
 // ─── Visual Editor ────────────────────────────────────────────────────────────
 class ChronoCompassCardEditor extends LitElement {
@@ -401,28 +318,6 @@ class ChronoCompassCardEditor extends LitElement {
 
     // compass_rotate: 'dial' is the only valid non-default value; everything else → 'needle'
     if (this._config.compass_rotate !== 'dial') this._config.compass_rotate = 'needle';
-
-    // Migrate ticks_round: boolean → ticks_linecap: string
-    ['major', 'minor', 'micro'].forEach(tier => {
-      const roundKey   = `${tier}_ticks_round`;
-      const linecapKey = `${tier}_ticks_linecap`;
-      if (this._config[roundKey] !== undefined && this._config[linecapKey] === undefined) {
-        this._config[linecapKey] = this._config[roundKey] ? 'round' : 'square';
-        delete this._config[roundKey];
-      }
-    });
-  }
-
-  // Mirrors ha-form-float._handleInput logic exactly.
-  // Returns the parsed number, undefined if the value is incomplete/invalid,
-  // or null to signal "return early, do not fire config-changed".
-  _parseNumber(raw) {
-    const v = String(raw).replace(',', '.');
-    if (v === '-' || v === '-0' || v.endsWith('.')) return null;
-    if (v.includes('.') && v.endsWith('0')) return null;
-    if (v === '') return undefined;
-    const n = parseFloat(v);
-    return isNaN(n) ? null : n;
   }
 
   _valueChanged(key, ev) {
@@ -436,7 +331,7 @@ class ChronoCompassCardEditor extends LitElement {
       value = ev.target.value;
     }
     if (ev.target.type === 'number') {
-      const parsed = this._parseNumber(value);
+      const parsed = ccParseNumber(value);
       if (parsed == null) return;
       value = parsed;
     }
@@ -446,27 +341,6 @@ class ChronoCompassCardEditor extends LitElement {
       bubbles: true,
       composed: true,
     }));
-  }
-
-  _colorPicker(label, value, onChange) {
-    const colorValue = /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#ffffff';
-    return html`
-      <div class="color-field">
-        <label>${label}</label>
-        <div class="color-row">
-          <input
-            type="color"
-            .value=${colorValue}
-            @input=${onChange}
-          />
-          <chrono-textfield
-            .value=${value}
-            placeholder="#RRGGBB or #RRGGBBAA"
-            @input=${onChange}
-          ></chrono-textfield>
-        </div>
-      </div>
-    `;
   }
 
   _addNeedle() {
@@ -492,7 +366,7 @@ class ChronoCompassCardEditor extends LitElement {
     } else {
       value = ev.target.value;
       if (ev.target.type === 'number') {
-        const parsed = this._parseNumber(value);
+        const parsed = ccParseNumber(value);
         if (parsed == null) return;
         value = parsed;
       }
@@ -529,7 +403,7 @@ class ChronoCompassCardEditor extends LitElement {
     } else {
       value = ev.target.value;
       if (ev.target.type === 'number') {
-        const parsed = this._parseNumber(value);
+        const parsed = ccParseNumber(value);
         if (parsed == null) return;
         value = parsed;
       }
@@ -543,45 +417,46 @@ class ChronoCompassCardEditor extends LitElement {
     }));
   }
 
-  _buttonPicker(label, key, options, align = '') {
-    return html`
-      <div class="toggle-field" style="${align ? `justify-self:${align}` : ''}">
-        ${label ? html`<label>${label}</label>` : ''}
-        <chrono-button-toggle-group
-          .value=${String(this._config[key])}
-          .options=${options}
-          @change=${e => this._valueChanged(key, e)}
-        ></chrono-button-toggle-group>
-      </div>
-    `;
+  _fieldChanged(i, key, ev) {
+    let value;
+    if (ev.target.tagName === 'HA-SWITCH') {
+      value = ev.target.checked;
+    } else {
+      value = ev.target.value;
+      if (ev.target.type === 'number') {
+        const parsed = ccParseNumber(value);
+        if (parsed == null) return;
+        value = parsed;
+      }
+    }
+    const fields = this._config.fields.map((f, idx) =>
+      idx === i ? { ...f, [key]: value } : f
+    );
+    this._config = { ...this._config, fields };
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      detail: { config: this._config }, bubbles: true, composed: true,
+    }));
   }
 
-  _textField(label, value, onChange, opts = {}) {
-    return html`
-      <div class="text-field">
-        <label>${label}</label>
-        <chrono-textfield
-          .value=${String(value)}
-          type=${opts.type || 'text'}
-          step=${opts.step || ''}
-          min=${opts.min !== undefined ? opts.min : ''}
-          max=${opts.max !== undefined ? opts.max : ''}
-          @input=${onChange}
-        ></chrono-textfield>
-      </div>
-    `;
-  }
-
-  _toggleField(label, checked, onChange, extraClass = '') {
-    return html`
-      <div class="toggle-field${extraClass ? ' ' + extraClass : ''}">
-        <label>${label}</label>
-        <ha-switch
-          .checked=${checked}
-          @change=${onChange}
-        ></ha-switch>
-      </div>
-    `;
+  _tickChanged(i, key, ev) {
+    let value;
+    if (ev.target.tagName === 'HA-SWITCH') {
+      value = ev.target.checked;
+    } else {
+      value = ev.target.value;
+      if (ev.target.type === 'number') {
+        const parsed = ccParseNumber(value);
+        if (parsed == null) return;
+        value = parsed;
+      }
+    }
+    const ticks = this._config.ticks.map((t, idx) =>
+      idx === i ? { ...t, [key]: value } : t
+    );
+    this._config = { ...this._config, ticks };
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      detail: { config: this._config }, bubbles: true, composed: true,
+    }));
   }
 
   render() {
@@ -594,29 +469,29 @@ class ChronoCompassCardEditor extends LitElement {
 
       <!-- Compass styling -->
       <div class="compass-styling-grid">
-        ${this._colorPicker('Background', this._config['background_color'] || '#ffffff', e => this._valueChanged('background_color', e))}
-        ${this._textField('Size', c.compass_size, e => this._valueChanged('compass_size', e), {type:'number', step:'1'})}
-        ${this._colorPicker('Bezel color', this._config['bezel_color'] || '#ffffff', e => this._valueChanged('bezel_color', e))}
-        ${this._textField('Bezel width', c.bezel_width, e => this._valueChanged('bezel_width', e), {type:'number', step:'1', min:'0'})}
+        ${ccColorPicker('Background', this._config['background_color'] || '#ffffff', e => this._valueChanged('background_color', e))}
+        ${ccTextField('Size', c.compass_size, e => this._valueChanged('compass_size', e), {type:'number', step:'1'})}
+        ${ccColorPicker('Bezel color', this._config['bezel_color'] || '#ffffff', e => this._valueChanged('bezel_color', e))}
+        ${ccTextField('Bezel width', c.bezel_width, e => this._valueChanged('bezel_width', e), {type:'number', step:'1', min:'0'})}
       </div>
 
       <!-- Background image -->
       <div class="background-toggles-grid">
-        ${this._toggleField('Background image', c.background_image_show, e => this._valueChanged('background_image_show', e))}
+        ${ccToggleField('Background image', c.background_image_show, e => this._valueChanged('background_image_show', e))}
       </div>
       <div class="background-image-template-grid">
-        ${this._textField('URL (jinja template allowed)', c.background_image_url, e => this._valueChanged('background_image_url', e))}
+        ${ccTextField('URL (jinja template allowed)', c.background_image_url, e => this._valueChanged('background_image_url', e))}
       </div>
       <div class="background-image-styling-grid">
-        ${this._textField('X pos', c.background_image_x, e => this._valueChanged('background_image_x', e), {type:'number', step:'0.5'})}
-        ${this._textField('Y pos', c.background_image_y, e => this._valueChanged('background_image_y', e), {type:'number', step:'0.5'})}
-        ${this._textField('Scale (%)', c.background_image_scale, e => this._valueChanged('background_image_scale', e), {type:'number', step:'1', min:'1'})}
-        ${this._textField('Rotate', c.background_image_rotate, e => this._valueChanged('background_image_rotate', e), {type:'number', step:'1'})}
+        ${ccTextField('X pos', c.background_image_x, e => this._valueChanged('background_image_x', e), {type:'number', step:'0.5'})}
+        ${ccTextField('Y pos', c.background_image_y, e => this._valueChanged('background_image_y', e), {type:'number', step:'0.5'})}
+        ${ccTextField('Scale (%)', c.background_image_scale, e => this._valueChanged('background_image_scale', e), {type:'number', step:'1', min:'1'})}
+        ${ccTextField('Rotate', c.background_image_rotate, e => this._valueChanged('background_image_rotate', e), {type:'number', step:'1'})}
       </div>
 
       <!-- Rotate compass -->
       <div class="rotate-compass-toggle-grid">
-        ${this._buttonPicker('Rotate', 'compass_rotate', [{ label: 'Needle', value: 'needle' }, { label: 'Dial', value: 'dial' }])}
+        ${ccButtonPicker('Rotate', c.compass_rotate, [{ label: 'Needle', value: 'needle' }, { label: 'Dial', value: 'dial' }], e => this._valueChanged('compass_rotate', e))}
         <div class="toggle-hint"><b>Needle</b> rotates the needle. <b>Dial</b> keeps Needle 1 pointing north while rotating the compass.</div>
       </div>
 
@@ -629,50 +504,50 @@ class ChronoCompassCardEditor extends LitElement {
 
           <!-- Name -->
           <div class="needle-name-grid">
-            ${this._textField('Name (optional)', n.name || '', e => this._needleChanged(i, 'name', e))}
+            ${ccTextField('Name (optional)', n.name || '', e => this._needleChanged(i, 'name', e))}
           </div>
 
           <!-- Toggles -->
           <div class="needle-toggles-grid">
-            ${this._toggleField('Show', n.show, e => this._needleChanged(i, 'show', e))}
-            ${this._toggleField('Invert', n.invert, e => this._needleChanged(i, 'invert', e))}
-            ${this._toggleField('Rotate 180°', n.rotate, e => this._needleChanged(i, 'rotate', e))}
+            ${ccToggleField('Show', n.show, e => this._needleChanged(i, 'show', e))}
+            ${ccToggleField('Invert', n.invert, e => this._needleChanged(i, 'invert', e))}
+            ${ccToggleField('Rotate 180°', n.rotate, e => this._needleChanged(i, 'rotate', e))}
           </div>
 
           <!-- Bearing template -->
           <div class="needle-template-grid">
-            ${this._textField('Bearing (jinja template)', n.template, e => this._needleChanged(i, 'template', e))}
+            ${ccTextField('Bearing (jinja template)', n.template, e => this._needleChanged(i, 'template', e))}
           </div>
 
           <!-- Colors -->
           <div class="needle-color-grid">
-            ${this._colorPicker('Color 1', n.color_1 || '#FF0000', e => this._needleChanged(i, 'color_1', e))}
-            ${this._textField('Pos (%)', n.color_1_pos, e => this._needleChanged(i, 'color_1_pos', e), {type:'number', step:'1', min:'0', max:'100'})}
-            ${this._colorPicker('Color 2', n.color_2 || '#EEEEEE', e => this._needleChanged(i, 'color_2', e))}
-            ${this._textField('Pos (%)', n.color_2_pos, e => this._needleChanged(i, 'color_2_pos', e), {type:'number', step:'1', min:'0', max:'100'})}
+            ${ccColorPicker('Color 1', n.color_1 || '#FF0000', e => this._needleChanged(i, 'color_1', e))}
+            ${ccTextField('Pos (%)', n.color_1_pos, e => this._needleChanged(i, 'color_1_pos', e), {type:'number', step:'1', min:'0', max:'100'})}
+            ${ccColorPicker('Color 2', n.color_2 || '#EEEEEE', e => this._needleChanged(i, 'color_2', e))}
+            ${ccTextField('Pos (%)', n.color_2_pos, e => this._needleChanged(i, 'color_2_pos', e), {type:'number', step:'1', min:'0', max:'100'})}
           </div>
 
           <!-- Dimensions -->
           <div class="needle-dimensions-grid">
-            ${this._textField('Position', n.position, e => this._needleChanged(i, 'position', e), {type:'number', step:'1'})}
-            ${this._textField('Height', n.height, e => this._needleChanged(i, 'height', e), {type:'number', step:'1', min:'4'})}
-            ${this._textField('Width', n.width, e => this._needleChanged(i, 'width', e), {type:'number', step:'1', min:'1'})}
-            ${this._textField('Morph', n.morph, e => this._needleChanged(i, 'morph', e), {type:'number', step:'1'})}
-            ${this._textField('Curve', n.curve, e => this._needleChanged(i, 'curve', e), {type:'number', step:'1'})}
+            ${ccTextField('Position', n.position, e => this._needleChanged(i, 'position', e), {type:'number', step:'1'})}
+            ${ccTextField('Height', n.height, e => this._needleChanged(i, 'height', e), {type:'number', step:'1', min:'4'})}
+            ${ccTextField('Width', n.width, e => this._needleChanged(i, 'width', e), {type:'number', step:'1', min:'1'})}
+            ${ccTextField('Morph', n.morph, e => this._needleChanged(i, 'morph', e), {type:'number', step:'1'})}
+            ${ccTextField('Curve', n.curve, e => this._needleChanged(i, 'curve', e), {type:'number', step:'1'})}
           </div>
 
           <!-- Needle image -->
           <div class="needle-image-toggles-grid">
-            ${this._toggleField('Needle image', n.image_show, e => this._needleChanged(i, 'image_show', e))}
+            ${ccToggleField('Needle image', n.image_show, e => this._needleChanged(i, 'image_show', e))}
           </div>
           <div class="needle-image-template-grid">
-            ${this._textField('URL (jinja template allowed)', n.image_url, e => this._needleChanged(i, 'image_url', e))}
+            ${ccTextField('URL (jinja template allowed)', n.image_url, e => this._needleChanged(i, 'image_url', e))}
           </div>
           <div class="needle-image-styling-grid">
-            ${this._textField('X pos', n.image_x, e => this._needleChanged(i, 'image_x', e), {type:'number', step:'0.5'})}
-            ${this._textField('Y pos', n.image_y, e => this._needleChanged(i, 'image_y', e), {type:'number', step:'0.5'})}
-            ${this._textField('Scale (%)', n.image_scale, e => this._needleChanged(i, 'image_scale', e), {type:'number', step:'1', min:'1'})}
-            ${this._textField('Rotate', n.image_rotate, e => this._needleChanged(i, 'image_rotate', e), {type:'number', step:'1'})}
+            ${ccTextField('X pos', n.image_x, e => this._needleChanged(i, 'image_x', e), {type:'number', step:'0.5'})}
+            ${ccTextField('Y pos', n.image_y, e => this._needleChanged(i, 'image_y', e), {type:'number', step:'0.5'})}
+            ${ccTextField('Scale (%)', n.image_scale, e => this._needleChanged(i, 'image_scale', e), {type:'number', step:'1', min:'1'})}
+            ${ccTextField('Rotate', n.image_rotate, e => this._needleChanged(i, 'image_rotate', e), {type:'number', step:'1'})}
           </div>
 
           <!-- Remove button -->
@@ -694,17 +569,17 @@ class ChronoCompassCardEditor extends LitElement {
       ${(c.markers || []).map((m, i) => html`
         <ha-expansion-panel header="Marker ${i + 1}" outlined>
           <div class="marker-toggles-grid">
-            ${this._toggleField('Show', m.show, e => this._markerChanged(i, 'show', e))}
-            ${this._toggleField('Flip', m.flip, e => this._markerChanged(i, 'flip', e))}
+            ${ccToggleField('Show', m.show, e => this._markerChanged(i, 'show', e))}
+            ${ccToggleField('Flip', m.flip, e => this._markerChanged(i, 'flip', e))}
           </div>
           <div class="marker-template-grid">
-            ${this._textField('Degrees (jinja template allowed)', m.degrees, e => this._markerChanged(i, 'degrees', e))}
+            ${ccTextField('Degrees (jinja template allowed)', m.degrees, e => this._markerChanged(i, 'degrees', e))}
           </div>
           <div class="marker-styling-grid">
-            ${this._textField('Position', m.position, e => this._markerChanged(i, 'position', e), {type:'number', step:'0.5'})}
-            ${this._textField('Height', m.height, e => this._markerChanged(i, 'height', e), {type:'number', step:'0.1', min:'0'})}
-            ${this._textField('Width', m.width, e => this._markerChanged(i, 'width', e), {type:'number', step:'0.1', min:'0'})}
-            ${this._colorPicker('Color', m.color || '#FF0000', e => this._markerChanged(i, 'color', e))}
+            ${ccTextField('Position', m.position, e => this._markerChanged(i, 'position', e), {type:'number', step:'0.5'})}
+            ${ccTextField('Height', m.height, e => this._markerChanged(i, 'height', e), {type:'number', step:'0.1', min:'0'})}
+            ${ccTextField('Width', m.width, e => this._markerChanged(i, 'width', e), {type:'number', step:'0.1', min:'0'})}
+            ${ccColorPicker('Color', m.color || '#FF0000', e => this._markerChanged(i, 'color', e))}
           </div>
           <div class="marker-remove-grid">
             <button class="marker-remove-btn" @click=${() => this._removeMarker(i)}>Remove marker</button>
@@ -722,61 +597,47 @@ class ChronoCompassCardEditor extends LitElement {
 
       <!-- Cardinal labels -->
       <div class="tick-toggles-grid">
-        ${this._toggleField('Cardinal labels', c.cardinals_show, e => this._valueChanged('cardinals_show', e), 'tick-toggle-field')}
+        ${ccToggleField('Cardinal labels', c.cardinals_show, e => this._valueChanged('cardinals_show', e), 'tick-toggle-field')}
       </div>
       
       <div class="cardinal-labels-grid">
-        ${this._textField('North', c.cardinal_north, e => this._valueChanged('cardinal_north', e))}
-        ${this._textField('East', c.cardinal_east, e => this._valueChanged('cardinal_east', e))}
-        ${this._textField('South', c.cardinal_south, e => this._valueChanged('cardinal_south', e))}
-        ${this._textField('West', c.cardinal_west, e => this._valueChanged('cardinal_west', e))}
+        ${ccTextField('North', c.cardinal_north, e => this._valueChanged('cardinal_north', e))}
+        ${ccTextField('East', c.cardinal_east, e => this._valueChanged('cardinal_east', e))}
+        ${ccTextField('South', c.cardinal_south, e => this._valueChanged('cardinal_south', e))}
+        ${ccTextField('West', c.cardinal_west, e => this._valueChanged('cardinal_west', e))}
       </div>
       
       <div class="cardinals-styling-grid">
-        ${this._textField('Position', c.cardinals_position, e => this._valueChanged('cardinals_position', e), {type:'number', step:'0.5'})}
-        ${this._textField('Font size', c.cardinals_fontsize, e => this._valueChanged('cardinals_fontsize', e), {type:'number', step:'0.5', min:'0'})}
-        ${this._textField('Font weight', c.cardinals_fontweight, e => this._valueChanged('cardinals_fontweight', e), {type:'number', step:'100', min:'100', max:'900'})}
-        ${this._colorPicker('Color', this._config['cardinals_fontcolor'] || '#ffffff', e => this._valueChanged('cardinals_fontcolor', e))}
+        ${ccTextField('Position', c.cardinals_position, e => this._valueChanged('cardinals_position', e), {type:'number', step:'0.5'})}
+        ${ccTextField('Font size', c.cardinals_fontsize, e => this._valueChanged('cardinals_fontsize', e), {type:'number', step:'0.5', min:'0'})}
+        ${ccTextField('Font weight', c.cardinals_fontweight, e => this._valueChanged('cardinals_fontweight', e), {type:'number', step:'100', min:'100', max:'900'})}
+        ${ccColorPicker('Color', this._config['cardinals_fontcolor'] || '#ffffff', e => this._valueChanged('cardinals_fontcolor', e))}
       </div>
 
-      <!-- Primary ticks -->
+      ${(c.ticks || []).map((t, i) => {
+        const labels = ['Primary', 'Secondary', 'Tertiary'];
+        const label  = labels[i] || `Tier ${i + 1}`;
+        return html`
+      <!-- ${label} ticks -->
       <div class="tick-toggles-grid">
-        ${this._toggleField('Primary ticks', c.major_ticks_show, e => this._valueChanged('major_ticks_show', e), 'tick-toggle-field')}
-        ${this._buttonPicker('', 'major_ticks_linecap', [{ label: 'Square', value: 'square' }, { label: 'Round', value: 'round' }], 'end')}
+        ${ccToggleField(`${label} ticks`, t.show, e => this._tickChanged(i, 'show', e), 'tick-toggle-field')}
+        <div class="toggle-field" style="justify-self:end">
+          <chrono-button-toggle-group
+            .value=${String(t.linecap)}
+            .options=${[{ label: 'Square', value: 'square' }, { label: 'Round', value: 'round' }]}
+            @change=${e => this._tickChanged(i, 'linecap', e)}
+          ></chrono-button-toggle-group>
+        </div>
       </div>
       <div class="tick-styling-grid">
-        ${this._textField('Position', c.major_ticks_position, e => this._valueChanged('major_ticks_position', e), {type:'number', step:'0.5'})}
-        ${this._textField('Length', c.major_ticks_length, e => this._valueChanged('major_ticks_length', e), {type:'number', step:'0.1', min:'0'})}
-        ${this._textField('Width', c.major_ticks_width, e => this._valueChanged('major_ticks_width', e), {type:'number', step:'0.1', min:'0'})}
-        ${this._textField('Divisions', c.major_ticks_divisions, e => this._valueChanged('major_ticks_divisions', e), {type:'number', step:'1', min:'1'})}
-        ${this._colorPicker('Color', this._config['major_ticks_color'] || '#ffffff', e => this._valueChanged('major_ticks_color', e))}
+        ${ccTextField('Position', t.position, e => this._tickChanged(i, 'position', e), {type:'number', step:'0.5'})}
+        ${ccTextField('Length', t.length, e => this._tickChanged(i, 'length', e), {type:'number', step:'0.1', min:'0'})}
+        ${ccTextField('Width', t.width, e => this._tickChanged(i, 'width', e), {type:'number', step:'0.1', min:'0'})}
+        ${ccTextField('Divisions', t.divisions, e => this._tickChanged(i, 'divisions', e), {type:'number', step:'1', min:'1'})}
+        ${ccColorPicker('Color', t.color || '#ffffff', e => this._tickChanged(i, 'color', e))}
       </div>
-
-      <!-- Medium ticks -->
-      <div class="tick-toggles-grid">
-        ${this._toggleField('Secondary ticks', c.minor_ticks_show, e => this._valueChanged('minor_ticks_show', e), 'tick-toggle-field')}
-        ${this._buttonPicker('', 'minor_ticks_linecap', [{ label: 'Square', value: 'square' }, { label: 'Round', value: 'round' }], 'end')}
-      </div>
-      <div class="tick-styling-grid">
-        ${this._textField('Position', c.minor_ticks_position, e => this._valueChanged('minor_ticks_position', e), {type:'number', step:'0.5'})}
-        ${this._textField('Length', c.minor_ticks_length, e => this._valueChanged('minor_ticks_length', e), {type:'number', step:'0.1', min:'0'})}
-        ${this._textField('Width', c.minor_ticks_width, e => this._valueChanged('minor_ticks_width', e), {type:'number', step:'0.1', min:'0'})}
-        ${this._textField('Divisions', c.minor_ticks_divisions, e => this._valueChanged('minor_ticks_divisions', e), {type:'number', step:'1', min:'1'})}
-        ${this._colorPicker('Color', this._config['minor_ticks_color'] || '#ffffff', e => this._valueChanged('minor_ticks_color', e))}
-      </div>
-
-      <!-- Micro ticks -->
-      <div class="tick-toggles-grid">
-        ${this._toggleField('Tertiary ticks', c.micro_ticks_show, e => this._valueChanged('micro_ticks_show', e), 'tick-toggle-field')}
-        ${this._buttonPicker('', 'micro_ticks_linecap', [{ label: 'Square', value: 'square' }, { label: 'Round', value: 'round' }], 'end')}
-      </div>
-      <div class="tick-styling-grid">
-        ${this._textField('Position', c.micro_ticks_position, e => this._valueChanged('micro_ticks_position', e), {type:'number', step:'0.5'})}
-        ${this._textField('Length', c.micro_ticks_length, e => this._valueChanged('micro_ticks_length', e), {type:'number', step:'0.1', min:'0'})}
-        ${this._textField('Width', c.micro_ticks_width, e => this._valueChanged('micro_ticks_width', e), {type:'number', step:'0.1', min:'0'})}
-        ${this._textField('Divisions', c.micro_ticks_divisions, e => this._valueChanged('micro_ticks_divisions', e), {type:'number', step:'1', min:'1'})}
-        ${this._colorPicker('Color', this._config['micro_ticks_color'] || '#ffffff', e => this._valueChanged('micro_ticks_color', e))}
-      </div>
+        `;
+      })}
 
       </ha-expansion-panel>
 
@@ -784,97 +645,59 @@ class ChronoCompassCardEditor extends LitElement {
 
       <!-- Header -->
       <div class="field-toggles-grid">
-        ${this._toggleField('Show header', c.header_show, e => this._valueChanged('header_show', e))}
+        ${ccToggleField('Show header', c.header_show, e => this._valueChanged('header_show', e))}
       </div>
       <div class="field-template-grid">
-        ${this._textField('Header (jinja template allowed)', c.header_text, e => this._valueChanged('header_text', e))}
+        ${ccTextField('Header (jinja template allowed)', c.header_text, e => this._valueChanged('header_text', e))}
       </div>
       <div class="field-styling-grid">
-        ${this._textField('Position', c.header_position, e => this._valueChanged('header_position', e), {type:'number', step:'1'})}
-        ${this._textField('Font size', c.header_fontsize, e => this._valueChanged('header_fontsize', e), {type:'number', step:'0.1'})}
-        ${this._textField('Font weight', c.header_fontweight, e => this._valueChanged('header_fontweight', e), {type:'number', step:'100', min:'100', max:'900'})}
-        ${this._colorPicker('Color', this._config['header_fontcolor'] || '#ffffff', e => this._valueChanged('header_fontcolor', e))}
+        ${ccTextField('Position', c.header_position, e => this._valueChanged('header_position', e), {type:'number', step:'1'})}
+        ${ccTextField('Font size', c.header_fontsize, e => this._valueChanged('header_fontsize', e), {type:'number', step:'0.1'})}
+        ${ccTextField('Font weight', c.header_fontweight, e => this._valueChanged('header_fontweight', e), {type:'number', step:'100', min:'100', max:'900'})}
+        ${ccColorPicker('Color', this._config['header_fontcolor'] || '#ffffff', e => this._valueChanged('header_fontcolor', e))}
       </div>
 
       <!-- Footer -->
       <div class="field-toggles-grid">
-        ${this._toggleField('Show footer', c.footer_show, e => this._valueChanged('footer_show', e))}
+        ${ccToggleField('Show footer', c.footer_show, e => this._valueChanged('footer_show', e))}
       </div>
       <div class="field-template-grid">
-        ${this._textField('Footer (jinja template allowed)', c.footer_text, e => this._valueChanged('footer_text', e))}
+        ${ccTextField('Footer (jinja template allowed)', c.footer_text, e => this._valueChanged('footer_text', e))}
       </div>
       <div class="field-styling-grid">
-        ${this._textField('Position', c.footer_position, e => this._valueChanged('footer_position', e), {type:'number', step:'1'})}
-        ${this._textField('Font size', c.footer_fontsize, e => this._valueChanged('footer_fontsize', e), {type:'number', step:'0.1'})}
-        ${this._textField('Font weight', c.footer_fontweight, e => this._valueChanged('footer_fontweight', e), {type:'number', step:'100', min:'100', max:'900'})}
-        ${this._colorPicker('Color', this._config['footer_fontcolor'] || '#ffffff', e => this._valueChanged('footer_fontcolor', e))}
+        ${ccTextField('Position', c.footer_position, e => this._valueChanged('footer_position', e), {type:'number', step:'1'})}
+        ${ccTextField('Font size', c.footer_fontsize, e => this._valueChanged('footer_fontsize', e), {type:'number', step:'0.1'})}
+        ${ccTextField('Font weight', c.footer_fontweight, e => this._valueChanged('footer_fontweight', e), {type:'number', step:'100', min:'100', max:'900'})}
+        ${ccColorPicker('Color', this._config['footer_fontcolor'] || '#ffffff', e => this._valueChanged('footer_fontcolor', e))}
       </div>
 
       </ha-expansion-panel>
 
       <ha-expansion-panel header="Custom fields configuration" outlined>
 
-      <!-- Field 1 -->
+      ${(c.fields || []).map((f, i) => html`
+
+      <!-- Field ${i + 1} -->
       <div class="field-toggles-grid">
-        ${this._toggleField('Show Field 1', c.field_1_show, e => this._valueChanged('field_1_show', e))}
+        ${ccToggleField(`Show Field ${i + 1}`, f.show, e => this._fieldChanged(i, 'show', e))}
       </div>
       <div class="field-template-grid">
-        ${this._textField('Text (jinja template allowed)', c.field_1_template, e => this._valueChanged('field_1_template', e))}
+        ${ccTextField('Text (jinja template allowed)', f.template, e => this._fieldChanged(i, 'template', e))}
       </div>
       <div class="field-styling-grid">
-        ${this._textField('Position (%)', c.field_1_position, e => this._valueChanged('field_1_position', e), {type:'number', step:'1'})}
-        ${this._textField('Font size', c.field_1_fontsize, e => this._valueChanged('field_1_fontsize', e), {type:'number', step:'0.1'})}
-        ${this._textField('Font weight', c.field_1_fontweight, e => this._valueChanged('field_1_fontweight', e), {type:'number', step:'100', min:'100', max:'900'})}
-        ${this._colorPicker('Color', this._config['field_1_fontcolor'] || '#ffffff', e => this._valueChanged('field_1_fontcolor', e))}
+        ${ccTextField('Position (%)', f.position, e => this._fieldChanged(i, 'position', e), {type:'number', step:'1'})}
+        ${ccTextField('Font size', f.fontsize, e => this._fieldChanged(i, 'fontsize', e), {type:'number', step:'0.1'})}
+        ${ccTextField('Font weight', f.fontweight, e => this._fieldChanged(i, 'fontweight', e), {type:'number', step:'100', min:'100', max:'900'})}
+        ${ccColorPicker('Color', f.fontcolor || '#ffffff', e => this._fieldChanged(i, 'fontcolor', e))}
       </div>
       <div class="field-unit-grid">
-        ${this._textField('Unit', c.field_1_unit, e => this._valueChanged('field_1_unit', e))}
-        ${this._textField('Font size', c.field_1_unit_fontsize, e => this._valueChanged('field_1_unit_fontsize', e), {type:'number', step:'0.1'})}
-        ${this._textField('Font weight', c.field_1_unit_fontweight, e => this._valueChanged('field_1_unit_fontweight', e), {type:'number', step:'100', min:'100', max:'900'})}
-        ${this._colorPicker('Color', this._config['field_1_unit_fontcolor'] || '#ffffff', e => this._valueChanged('field_1_unit_fontcolor', e))}
+        ${ccTextField('Unit', f.unit, e => this._fieldChanged(i, 'unit', e))}
+        ${ccTextField('Font size', f.unit_fontsize, e => this._fieldChanged(i, 'unit_fontsize', e), {type:'number', step:'0.1'})}
+        ${ccTextField('Font weight', f.unit_fontweight, e => this._fieldChanged(i, 'unit_fontweight', e), {type:'number', step:'100', min:'100', max:'900'})}
+        ${ccColorPicker('Color', f.unit_fontcolor || '#ffffff', e => this._fieldChanged(i, 'unit_fontcolor', e))}
       </div>
 
-
-      <!-- Field 2 -->
-      <div class="field-toggles-grid">
-        ${this._toggleField('Show Field 2', c.field_2_show, e => this._valueChanged('field_2_show', e))}
-      </div>
-      <div class="field-template-grid">
-        ${this._textField('Text (jinja template allowed)', c.field_2_template, e => this._valueChanged('field_2_template', e))}
-      </div>
-      <div class="field-styling-grid">
-        ${this._textField('Position (%)', c.field_2_position, e => this._valueChanged('field_2_position', e), {type:'number', step:'1'})}
-        ${this._textField('Font size', c.field_2_fontsize, e => this._valueChanged('field_2_fontsize', e), {type:'number', step:'0.1'})}
-        ${this._textField('Font weight', c.field_2_fontweight, e => this._valueChanged('field_2_fontweight', e), {type:'number', step:'100', min:'100', max:'900'})}
-        ${this._colorPicker('Color', this._config['field_2_fontcolor'] || '#ffffff', e => this._valueChanged('field_2_fontcolor', e))}
-      </div>
-      <div class="field-unit-grid">
-        ${this._textField('Unit', c.field_2_unit, e => this._valueChanged('field_2_unit', e))}
-        ${this._textField('Font size', c.field_2_unit_fontsize, e => this._valueChanged('field_2_unit_fontsize', e), {type:'number', step:'0.1'})}
-        ${this._textField('Font weight', c.field_2_unit_fontweight, e => this._valueChanged('field_2_unit_fontweight', e), {type:'number', step:'100', min:'100', max:'900'})}
-        ${this._colorPicker('Color', this._config['field_2_unit_fontcolor'] || '#ffffff', e => this._valueChanged('field_2_unit_fontcolor', e))}
-      </div>
-
-
-      <!-- Field 3 -->
-      <div class="field-toggles-grid">
-        ${this._toggleField('Show Field 3', c.field_3_show, e => this._valueChanged('field_3_show', e))}
-      </div>
-      <div class="field-template-grid">
-        ${this._textField('Text (jinja template allowed)', c.field_3_template, e => this._valueChanged('field_3_template', e))}
-      </div>
-      <div class="field-styling-grid">
-        ${this._textField('Position (%)', c.field_3_position, e => this._valueChanged('field_3_position', e), {type:'number', step:'1'})}
-        ${this._textField('Font size', c.field_3_fontsize, e => this._valueChanged('field_3_fontsize', e), {type:'number', step:'0.1'})}
-        ${this._textField('Font weight', c.field_3_fontweight, e => this._valueChanged('field_3_fontweight', e), {type:'number', step:'100', min:'100', max:'900'})}
-        ${this._colorPicker('Color', this._config['field_3_fontcolor'] || '#ffffff', e => this._valueChanged('field_3_fontcolor', e))}
-      </div>
-      <div class="field-unit-grid">
-        ${this._textField('Unit', c.field_3_unit, e => this._valueChanged('field_3_unit', e))}
-        ${this._textField('Font size', c.field_3_unit_fontsize, e => this._valueChanged('field_3_unit_fontsize', e), {type:'number', step:'0.1'})}
-        ${this._textField('Font weight', c.field_3_unit_fontweight, e => this._valueChanged('field_3_unit_fontweight', e), {type:'number', step:'100', min:'100', max:'900'})}
-        ${this._colorPicker('Color', this._config['field_3_unit_fontcolor'] || '#ffffff', e => this._valueChanged('field_3_unit_fontcolor', e))}
-      </div>
+      `)}
 
       </ha-expansion-panel>
     `;
@@ -1230,9 +1053,7 @@ customElements.define('chrono-compass-card-editor', ChronoCompassCardEditor);
 // ─── Main Card ────────────────────────────────────────────────────────────────
 class ChronoCompassCard extends LitElement {
   static properties = {
-    _field1Value:           { type: String },
-    _field2Value:           { type: String },
-    _field3Value:           { type: String },
+    _fieldValues:           { type: Array },
     _headerValue:           { type: String },
     _footerValue:           { type: String },
     _markerDegrees:         { type: Array },
@@ -1246,9 +1067,7 @@ class ChronoCompassCard extends LitElement {
     this._needlePrevDegrees   = [];   // non-reactive, for shortest-arc tracking
     this._templateUnsubs      = [];
     this._subscriptionsActive = false;
-    this._field1Value         = '';
-    this._field2Value         = '';
-    this._field3Value         = '';
+    this._fieldValues         = [];
     this._headerValue         = '';
     this._footerValue         = '';
     this._markerDegrees       = [];
@@ -1272,16 +1091,6 @@ class ChronoCompassCard extends LitElement {
 
     // compass_rotate: 'dial' is the only valid non-default value; everything else → 'needle'
     if (this._config.compass_rotate !== 'dial') this._config.compass_rotate = 'needle';
-
-    // Migrate ticks_round: boolean → ticks_linecap: string
-    ['major', 'minor', 'micro'].forEach(tier => {
-      const roundKey  = `${tier}_ticks_round`;
-      const linecapKey = `${tier}_ticks_linecap`;
-      if (this._config[roundKey] !== undefined && this._config[linecapKey] === undefined) {
-        this._config[linecapKey] = this._config[roundKey] ? 'round' : 'square';
-        delete this._config[roundKey];
-      }
-    });
 
     // Set all CSS custom properties once — browser handles all resizing from here
     const c = this._config;
@@ -1362,10 +1171,12 @@ class ChronoCompassCard extends LitElement {
 
     // Custom fields
     for (const def of this._fieldDefs) {
-      if (!def.show) { this[`_field${def.index}Value`] = ''; continue; }
+      if (!def.show) { this._fieldValues[def.index] = ''; continue; }
       const idx = def.index;
       sub(String(def.template), (result) => {
-        this[`_field${idx}Value`] = String(result).replace('${compass_direction}', this.getCompassDirection(this._needleDegrees[0] ?? 0));
+        const newValues = [...this._fieldValues];
+        newValues[idx] = String(result).replace('${compass_direction}', this.getCompassDirection(this._needleDegrees[0] ?? 0));
+        this._fieldValues = newValues;
       });
     }
 
@@ -1420,16 +1231,14 @@ class ChronoCompassCard extends LitElement {
       const tmpl = String(def.template);
       if (!tmpl.includes('${compass_direction}')) continue;
       if (tmpl.includes('{{')) continue;
-      this[`_field${def.index}Value`] = tmpl.replace('${compass_direction}', direction);
+      const newValues = [...this._fieldValues];
+      newValues[def.index] = tmpl.replace('${compass_direction}', direction);
+      this._fieldValues = newValues;
     }
   }
 
   get _fieldDefs() {
-    return [
-      { index: 1, show: this.config.field_1_show, template: this.config.field_1_template },
-      { index: 2, show: this.config.field_2_show, template: this.config.field_2_template },
-      { index: 3, show: this.config.field_3_show, template: this.config.field_3_template },
-    ];
+    return (this.config.fields || []).map((f, i) => ({ index: i, show: f.show, template: f.template }));
   }
 
   _teardownSubscriptions() {
@@ -1437,7 +1246,9 @@ class ChronoCompassCard extends LitElement {
     this._templateUnsubs      = [];
     this._subscriptionsActive = false;
     for (const unsub of unsubs) {
-      Promise.resolve(unsub).then(fn => fn()).catch(() => {});
+      // Promise.resolve(unsub).then(fn => fn()).catch(() => {});
+      // Prevents warning in the console:
+      Promise.resolve(unsub).then(fn => fn().catch(() => {})).catch(() => {});
     }
   }
 
@@ -1527,9 +1338,6 @@ class ChronoCompassCard extends LitElement {
     const cx  = 50, cy = 50, r = 50;
 
     const _cardinals_offset   =  2.5;
-    const _major_ticks_offset = -2.9;
-    const _minor_ticks_offset = -4.6;
-    const _micro_ticks_offset = -6.3;
 
     const cardinals = [c.cardinal_north, c.cardinal_east, c.cardinal_south, c.cardinal_west];
     const round1    = (v) => Math.round(v * 10) / 10;
@@ -1561,21 +1369,26 @@ class ChronoCompassCard extends LitElement {
     }
 
     // 2. Tier Definitions
-    const tierDefs = [
-      { key: 'major', offset: _major_ticks_offset, show: c.major_ticks_show, linecap: c.major_ticks_linecap || 'round', divisions: parseInt(c.major_ticks_divisions) || 4,  length: c.major_ticks_length, width: c.major_ticks_width, color: c.major_ticks_color, position: c.major_ticks_position || 0 },
-      { key: 'minor', offset: _minor_ticks_offset, show: c.minor_ticks_show, linecap: c.minor_ticks_linecap || 'round', divisions: parseInt(c.minor_ticks_divisions) || 8,  length: c.minor_ticks_length, width: c.minor_ticks_width, color: c.minor_ticks_color, position: c.minor_ticks_position || 0 },
-      { key: 'micro', offset: _micro_ticks_offset, show: c.micro_ticks_show, linecap: c.micro_ticks_linecap || 'round', divisions: parseInt(c.micro_ticks_divisions) || 16, length: c.micro_ticks_length, width: c.micro_ticks_width, color: c.micro_ticks_color, position: c.micro_ticks_position || 0 },
-    ];
+    const tierDefs = (c.ticks || []).map((t) => ({
+      show:      t.show,
+      linecap:   t.linecap || 'round',
+      divisions: parseInt(t.divisions) || 4,
+      length:    t.length,
+      width:     t.width,
+      color:     t.color,
+      position:  t.position || 0,
+    }));
 
     // 3. Tick Rendering: Strict Hierarchy
-    // Major ticks are always allowed to render. Minor/Micro are blocked if angle is occupied.
-    tierDefs.forEach((tier) => {
+    // Tier 0 always renders regardless of occupied positions.
+    // Tiers 1+ are blocked if the angle is already occupied.
+    tierDefs.forEach((tier, tierIndex) => {
       if (tier.show) {
         const step = 360 / tier.divisions;
         for (let i = 0; i < tier.divisions; i++) {
           const angleDeg = round1(i * step);
 
-          if (tier.key !== 'major' && occupied.has(angleDeg)) continue;
+          if (tierIndex !== 0 && occupied.has(angleDeg)) continue;
 
           occupied.add(angleDeg);
 
@@ -1586,10 +1399,10 @@ class ChronoCompassCard extends LitElement {
           const width    = parseFloat(tier.width);
           const position = parseFloat(tier.position);
 
-          const x1 = cx + (r + tier.offset + position)          * sinA;
-          const y1 = cy - (r + tier.offset + position)          * cosA;
-          const x2 = cx + (r + tier.offset + position - length) * sinA;
-          const y2 = cy - (r + tier.offset + position - length) * cosA;
+          const x1 = cx + (r + position)          * sinA;
+          const y1 = cy - (r + position)          * cosA;
+          const x2 = cx + (r + position - length) * sinA;
+          const y2 = cy - (r + position - length) * cosA;
 
           ticks.push({
             type: 'line', x1, y1, x2, y2,
@@ -1647,8 +1460,8 @@ class ChronoCompassCard extends LitElement {
       </div>
     `;
   }
-  _fieldStyle(def, baseOffset) {
-    return `font-size:${def.fontsize * 8}cqi; font-weight:${def.fontweight}; color:${def.fontcolor}; top:${baseOffset - def.position}%;`;
+  _fieldStyle(def) {
+    return `font-size:${def.fontsize * 8}cqi; font-weight:${def.fontweight}; color:${def.fontcolor}; top:${def.position}%;`;
   }
 
   _unitStyle(def) {
@@ -1663,17 +1476,24 @@ class ChronoCompassCard extends LitElement {
     const needle0Degrees  = this._needleDegrees[0] ?? 0;
     const compassRotation = c.compass_rotate === 'dial' ? -needle0Degrees : 0;
 
-    const fieldDefs = [
-      { index: 1, base: 25, show: c.field_1_show, unit: c.field_1_unit, fontsize: parseFloat(c.field_1_fontsize), fontweight: c.field_1_fontweight, position: c.field_1_position, fontcolor: c.field_1_fontcolor, unit_fontsize: parseFloat(c.field_1_unit_fontsize), unit_fontweight: c.field_1_unit_fontweight, unit_fontcolor: c.field_1_unit_fontcolor },
-      { index: 2, base: 50, show: c.field_2_show, unit: c.field_2_unit, fontsize: parseFloat(c.field_2_fontsize), fontweight: c.field_2_fontweight, position: c.field_2_position, fontcolor: c.field_2_fontcolor, unit_fontsize: parseFloat(c.field_2_unit_fontsize), unit_fontweight: c.field_2_unit_fontweight, unit_fontcolor: c.field_2_unit_fontcolor },
-      { index: 3, base: 75, show: c.field_3_show, unit: c.field_3_unit, fontsize: parseFloat(c.field_3_fontsize), fontweight: c.field_3_fontweight, position: c.field_3_position, fontcolor: c.field_3_fontcolor, unit_fontsize: parseFloat(c.field_3_unit_fontsize), unit_fontweight: c.field_3_unit_fontweight, unit_fontcolor: c.field_3_unit_fontcolor },
-    ];
+    const fieldDefs = (c.fields || []).map((f, i) => ({
+      index:          i,
+      show:           f.show,
+      unit:           f.unit,
+      fontsize:       parseFloat(f.fontsize),
+      fontweight:     f.fontweight,
+      position:       f.position,
+      fontcolor:      f.fontcolor,
+      unit_fontsize:  parseFloat(f.unit_fontsize),
+      unit_fontweight: f.unit_fontweight,
+      unit_fontcolor: f.unit_fontcolor,
+    }));
 
-    const renderField = (def, val) => {
+    const renderField = (def) => {
       if (!def.show) return html``;
       return html`
-        <div class="field field-${def.index}" style=${this._fieldStyle(def, def.base)}>
-          ${val}${def.unit ? html`<span style=${this._unitStyle(def)}>${def.unit}</span>` : ''}
+        <div class="field field-${def.index}" style=${this._fieldStyle(def)}>
+          ${this._fieldValues[def.index] ?? ''}${def.unit ? html`<span style=${this._unitStyle(def)}>${def.unit}</span>` : ''}
         </div>
       `;
     };
@@ -1764,9 +1584,7 @@ class ChronoCompassCard extends LitElement {
                   style="transform: translate(-50%, -50%) translate(${c.background_image_x}%, ${-c.background_image_y}%) rotate(${c.background_image_rotate}deg) scale(${c.background_image_scale / 100});"
                 />
               ` : ''}
-              ${renderField(fieldDefs[0], this._field1Value)}
-              ${renderField(fieldDefs[1], this._field2Value)}
-              ${renderField(fieldDefs[2], this._field3Value)}
+              ${fieldDefs.map(def => renderField(def))}
             </div>
             <div class="compass-rotate-group" style="transform:rotate(${compassRotation}deg)">
               ${this._renderTicks()}
