@@ -18,7 +18,7 @@
 
   [![](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
   [![](https://img.shields.io/badge/License-AGPL_3.0-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/agpl-3.0)
-  [![](https://img.shields.io/badge/Version-4.3.723-brightgreen.svg?style=for-the-badge)](#)
+  [![](https://img.shields.io/badge/Version-4.4.802-brightgreen.svg?style=for-the-badge)](#)
 </div>
 
 ---
