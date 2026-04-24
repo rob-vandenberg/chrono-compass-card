@@ -5,9 +5,11 @@ on:
     branches:
       - main
     paths:
-      - 'src/chrono-compass-card.js'
-      - 'src/chrono-compass-lib.js'
+      - 'src/*.js'
   workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: write
@@ -28,7 +30,7 @@ jobs:
       - name: Build
         run: yarn build
 
-      - name: Commit built file
+      - name: Commit built files
         uses: EndBug/add-and-commit@v9
         with:
           add: '["dist/chrono-compass-card.js", "dist/chrono-compass-lib.js"]'

@@ -3,6 +3,7 @@
 Thumbs.db
 
 # Folders
+docs/
 backup/
 artwork/
 screenshot/
@@ -10,6 +11,8 @@ chrono-compass-card/
 github/
 
 # Files
+*.ai
+*.psd
 *.bat
 gitdelete.bat
 gitremove.bat

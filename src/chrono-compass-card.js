@@ -3,9 +3,10 @@ import { live } from 'https://unpkg.com/lit@2.0.0/directives/live.js?module';
 import { ccParseNumber, ccTextField, ccToggleField, ccColorPicker, ccButtonPicker, ChronoTextfield, ChronoButtonToggleGroup } from './chrono-compass-lib.js';
 
 // ─── Card Version ─────────────────────────────────────────────────────────────
-const CARD_VERSION = '4.4.802';
+const CARD_VERSION = '4.4.803';
 
 // ─── Card Version History ─────────────────────────────────────────────────────
+// v4.4.803: Replace inline toggle-field/chrono-button-toggle-group in tick linecap picker with ccButtonPicker
 // v4.4.802: Move _textField, _toggleField, _colorPicker, _buttonPicker editor helpers to chrono-compass-lib.js; import ccTextField, ccToggleField, ccColorPicker, ccButtonPicker
 // v4.4.800: Extract ChronoTextfield, ChronoButtonToggleGroup, ccParseNumber into chrono-compass-lib.js; import from library
 // v4.3.727: Refactor tick tiers from flat keys (major_ticks_*, minor_ticks_*, micro_ticks_*) to ticks[] array; add DEFAULT_TICK constant; tier offset constants removed, default position values used instead; tier 0 exempt from occupied check, tiers 1+ blocked by occupied
@@ -621,13 +622,7 @@ class ChronoCompassCardEditor extends LitElement {
       <!-- ${label} ticks -->
       <div class="tick-toggles-grid">
         ${ccToggleField(`${label} ticks`, t.show, e => this._tickChanged(i, 'show', e), 'tick-toggle-field')}
-        <div class="toggle-field" style="justify-self:end">
-          <chrono-button-toggle-group
-            .value=${String(t.linecap)}
-            .options=${[{ label: 'Square', value: 'square' }, { label: 'Round', value: 'round' }]}
-            @change=${e => this._tickChanged(i, 'linecap', e)}
-          ></chrono-button-toggle-group>
-        </div>
+        ${ccButtonPicker('', t.linecap, [{ label: 'Square', value: 'square' }, { label: 'Round', value: 'round' }], e => this._tickChanged(i, 'linecap', e), 'end')}
       </div>
       <div class="tick-styling-grid">
         ${ccTextField('Position', t.position, e => this._tickChanged(i, 'position', e), {type:'number', step:'0.5'})}

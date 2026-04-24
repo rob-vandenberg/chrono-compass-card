@@ -1,6 +1,11 @@
-# Chrono Compass Card for Home Assistant
-
 <div align="center">
+
+  [![](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
+  [![](https://img.shields.io/badge/License-AGPL_3.0-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/agpl-3.0)
+  [![](https://img.shields.io/github/v/release/rob-vandenberg/chrono-compass-card?style=for-the-badge&color=brightgreen&label=Version)](https://github.com/rob-vandenberg/chrono-compass-card/releases)
+
+  <img src="art/header.svg" width="800" alt="Chrono Compass Card Banner">
+
   <img src="art/banner.jpg" width="800" alt="Chrono Compass Card Banner">
   
   <p align="center">
@@ -16,9 +21,6 @@
     <a href="#license">License</a>
   </p>
 
-  [![](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
-  [![](https://img.shields.io/badge/License-AGPL_3.0-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/agpl-3.0)
-  [![](https://img.shields.io/badge/Version-4.4.802-brightgreen.svg?style=for-the-badge)](#)
 </div>
 
 ---
@@ -344,4 +346,4 @@ Copyright © 2026 Rob Vandenberg. All rights reserved.
 
 If you find this project useful and wish to support its continued development, please consider a contribution.
 
-[![](https://img.shields.io/badge/Buy_Me_A_Coffee-Support-yellow.svg?style=for-the-badge)](https://www.buymeacoffee.com/)
+[![](https://img.shields.io/badge/Buy_Me_A_Coffee-Support-yellow.svg?style=for-the-badge)](https://www.buymeacoffee.com/robvandenberg)
